@@ -1,0 +1,1044 @@
+module Cisco-IOS-XE-ios-events-oper {
+  yang-version 1;
+  namespace "http://cisco.com/ns/yang/Cisco-IOS-XE-ios-events-oper";
+  prefix ios-events-ios-xe-oper;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+
+  organization
+    "Cisco Systems, Inc.";
+  contact
+    "Cisco Systems, Inc.
+     Customer Service
+     
+     Postal: 170 W Tasman Drive
+     San Jose, CA 95134
+     
+     Tel: +1 1800 553-NETS
+     
+     E-mail: cs-yang@cisco.com";
+  description
+    "This module contains a collection of YANG definitions
+     for asynchronous events from network element.
+     Copyright (c) 2016-2017 by Cisco Systems, Inc.
+     All rights reserved.";
+
+  revision 2017-10-10 {
+    description
+      "Initial revision";
+    reference "1.0.0";
+  }
+
+  typedef notification-severity {
+    type enumeration {
+      enum "notf-sev-critical" {
+        value 0;
+      }
+      enum "notf-sev-major" {
+        value 1;
+      }
+      enum "notf-sev-minor" {
+        value 2;
+      }
+    }
+    description
+      "Notification severity";
+  }
+
+  typedef bgp-pstate {
+    type enumeration {
+      enum "bgp-state-idle" {
+        value 0;
+      }
+      enum "bgp-state-connect" {
+        value 1;
+      }
+      enum "bgp-state-active" {
+        value 2;
+      }
+      enum "bgp-state-opensent" {
+        value 3;
+      }
+      enum "bgp-state-openconfirm" {
+        value 4;
+      }
+      enum "bgp-state-established" {
+        value 5;
+      }
+      enum "bgp-state-clearing" {
+        value 6;
+      }
+      enum "bgp-state-deleted" {
+        value 7;
+      }
+    }
+    description
+      "GGP state";
+  }
+
+  typedef notification-failure-state {
+    type enumeration {
+      enum "notf-failure-state-ok" {
+        value 0;
+        description
+          "Notification failure state ok";
+      }
+      enum "notf-failure-state-failed" {
+        value 1;
+        description
+          "Notification failure state failed";
+      }
+    }
+    description
+      "Notification failure state";
+  }
+
+  typedef hardware-sensor-type {
+    type enumeration {
+      enum "hw-sensor-board" {
+        value 0;
+        description
+          "Hardware sensor board";
+      }
+      enum "hw-sensor-cpu-junction" {
+        value 1;
+        description
+          "Hardware sensor CPU junction";
+      }
+      enum "hw-sensor-dram" {
+        value 2;
+        description
+          "Hardware sensor DRAM";
+      }
+      enum "hw-sensor-pim" {
+        value 3;
+        description
+          "Hardware sensor PIM";
+      }
+    }
+    description
+      "Hardware Sensor Type";
+  }
+
+  typedef notification-sensor-state {
+    type enumeration {
+      enum "SENSOR_STATE_GREEN" {
+        value 0;
+        description
+          "Sensor state green";
+      }
+      enum "SENSOR_STATE_YELLOW" {
+        value 1;
+        description
+          "Sensor state yellow";
+      }
+      enum "SENSOR_STATE_RED" {
+        value 2;
+        description
+          "Sensor state red";
+      }
+    }
+    description
+      "Notification sensor state";
+  }
+
+  typedef notification-module-state {
+    type enumeration {
+      enum "notf-module-state-inserted" {
+        value 0;
+        description
+          "Notification module inserted state";
+      }
+      enum "notf-module-state-removed" {
+        value 1;
+        description
+          "Notification module removed state";
+      }
+    }
+    description
+      "Notification module state";
+  }
+
+  typedef ospf-state {
+    type enumeration {
+      enum "ospf-state-full" {
+        value 0;
+      }
+      enum "ospf-state-deleted" {
+        value 1;
+      }
+      enum "ospf-state-depend-upon" {
+        value 2;
+      }
+      enum "ospf-state-down" {
+        value 3;
+      }
+      enum "ospf-state-attempt" {
+        value 4;
+      }
+      enum "ospf-state-init" {
+        value 5;
+      }
+      enum "ospf-state-two-way" {
+        value 6;
+      }
+      enum "ospf-state-exstart" {
+        value 7;
+      }
+      enum "ospf-state-exchange" {
+        value 8;
+      }
+      enum "ospf-state-loading" {
+        value 9;
+      }
+    }
+    description
+      "OSPF state";
+  }
+
+  typedef intf-admin-state {
+    type enumeration {
+      enum "intf-state-up" {
+        value 0;
+      }
+      enum "intf-state-down" {
+        value 1;
+      }
+    }
+    description
+      "Interface admin state";
+  }
+
+  grouping bgp-peer-state {
+    description
+      "BGP peer state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "IP address";
+    }
+    leaf vrf-name {
+      type string;
+      description
+        "VRF name";
+    }
+    leaf peer {
+      type inet:ip-address;
+      description
+        "Peer IP address";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:bgp-pstate;
+      description
+        "New BGP state";
+    }
+    leaf local-address {
+      type inet:ip-address;
+      description
+        "Local IP address";
+    }
+    leaf local-routerid {
+      type inet:ip-address;
+      description
+        "Local router ID";
+    }
+    leaf peer-routerid {
+      type inet:ip-address;
+      description
+        "Peer router ID";
+    }
+  }
+
+  grouping ospf-neighbor-state {
+    description
+      "OSPF neighbor state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf vrf-name {
+      type string;
+      description
+        "VRF Name";
+    }
+    leaf neighbor {
+      type inet:ip-address;
+      description
+        "Neighbor IP address";
+    }
+    leaf router-id {
+      type inet:ip-address;
+      description
+        "Router ID";
+    }
+    leaf if-addr {
+      type inet:ip-prefix;
+      description
+        "Interface address";
+    }
+    leaf ospf-new-state {
+      type ios-events-ios-xe-oper:ospf-state;
+      description
+        "New OSPF state";
+    }
+  }
+
+  grouping interface-oper-state {
+    description
+      "Interface operational state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf vrf-name {
+      type string;
+      description
+        "VRF name";
+    }
+    leaf if-name {
+      type string;
+      description
+        "Interface name";
+    }
+    leaf new-state-up {
+      type boolean;
+      description
+        "Is the new state up or down (true for UP)";
+    }
+  }
+
+  grouping interface-admin-state {
+    description
+      "Interface admin state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf vrf-name {
+      type string;
+      description
+        "VRF name";
+    }
+    leaf if-name {
+      type string;
+      description
+        "Interface name";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:intf-admin-state;
+      description
+        "New interface admin state";
+    }
+  }
+
+  grouping dhcp-server-state {
+    description
+      "DHCP server state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf vrf-name {
+      type string;
+      description
+        "VRF name";
+    }
+    leaf if-name {
+      type string;
+      description
+        "Interface name";
+    }
+    leaf new-state-up {
+      type boolean;
+      description
+        "Is the new state up (true for UP)";
+    }
+  }
+
+  grouping system-reboot-issued {
+    description
+      "System reboot issued";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf reboot-reason {
+      type string;
+      description
+        "System reboot reason";
+    }
+  }
+
+  grouping system-reboot-complete {
+    description
+      "System reboot complete";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+  }
+
+  grouping disk-usage {
+    description
+      "Disk usage";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf warning {
+      type string;
+      description
+        "Disk usage level warning";
+    }
+    leaf total-mb {
+      type uint32;
+      description
+        "Total memory in megabytes";
+    }
+    leaf free-mb {
+      type uint32;
+      description
+        "Free memory in megabytes";
+    }
+  }
+
+  grouping flash-fault {
+    description
+      "Flash fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New flash fault state";
+    }
+  }
+
+  grouping emmc-fault {
+    description
+      "Emmc fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New emmc fault state";
+    }
+  }
+
+  grouping sdcard-fault {
+    description
+      "SD card fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New sdcard fault state";
+    }
+  }
+
+  grouping tempsensor-fault {
+    description
+      "Tempsensor fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf hw-sensor-type {
+      type ios-events-ios-xe-oper:hardware-sensor-type;
+      description
+        "HW sensor type";
+    }
+    leaf hw-dev-index {
+      type uint32;
+      description
+        "HW device index";
+    }
+    leaf name {
+      type string;
+      description
+        "Temp sensor fault";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New temp sensor state";
+    }
+  }
+
+  grouping tempsensor-state {
+    description
+      "Tempsensor state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf hw-sensor-type {
+      type ios-events-ios-xe-oper:hardware-sensor-type;
+      description
+        "HW sensor type";
+    }
+    leaf hw-dev-index {
+      type uint32;
+      description
+        "HW device index";
+    }
+    leaf name {
+      type string;
+      description
+        "Tempsensor state";
+    }
+    leaf temp {
+      type uint32;
+      description
+        "temprature";
+    }
+    leaf sensor-new-state {
+      type ios-events-ios-xe-oper:notification-sensor-state;
+      description
+        "Sensor new state";
+    }
+  }
+
+  grouping fan-fault {
+    description
+      "Fan fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf fantray-id {
+      type uint32;
+      description
+        "Fan tray id";
+    }
+    leaf fan-id {
+      type uint32;
+      description
+        "Fan id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New fan fault state";
+    }
+  }
+
+  grouping fantray-fault {
+    description
+      "Fan tray fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf fantray-id {
+      type uint32;
+      description
+        "Fan tray id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New fan tray fault state";
+    }
+  }
+
+  grouping pem-fault {
+    description
+      "PEM fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf pem-id {
+      type uint32;
+      description
+        "PEM id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New pem fault state";
+    }
+  }
+
+  grouping pem-state-change {
+    description
+      "PEM state change";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf pem-id {
+      type uint32;
+      description
+        "PEM id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New pem state";
+    }
+  }
+
+  grouping pim-fault {
+    description
+      "PIM fault";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf pim-id {
+      type uint32;
+      description
+        "PIM id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-failure-state;
+      description
+        "New pim fault state";
+    }
+  }
+
+  grouping pim-state-change {
+    description
+      "PIM state change notification";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf pim-id {
+      type uint32;
+      description
+        "PIM id";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New pim state";
+    }
+  }
+
+  grouping sfp-state-change {
+    description
+      "SFP state change";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf sfp-name {
+      type string;
+      description
+        "SFP name";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New SFP state";
+    }
+  }
+
+  grouping sfp-support-state {
+    description
+      "SFP support state";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf sfp-name {
+      type string;
+      description
+        "SFP name";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New SFP support state";
+    }
+  }
+
+  grouping usb-state-change {
+    description
+      "USB state change";
+    leaf severity {
+      type ios-events-ios-xe-oper:notification-severity;
+      description
+        "Event severity";
+    }
+    leaf host-name {
+      type string;
+      description
+        "Host name";
+    }
+    leaf system-ip {
+      type inet:ip-address;
+      description
+        "System IP address";
+    }
+    leaf usb-slot {
+      type uint32;
+      description
+        "USB slot";
+    }
+    leaf new-state {
+      type ios-events-ios-xe-oper:notification-module-state;
+      description
+        "New USB state";
+    }
+  }
+
+  notification bgp-peer-state-change {
+    description
+      "BGP peer state change notification";
+    uses ios-events-ios-xe-oper:bgp-peer-state;
+  }
+  notification ospf-neighbor-state-change {
+    description
+      "OSPF neighbor state change notification";
+    uses ios-events-ios-xe-oper:ospf-neighbor-state;
+  }
+  notification interface-state-change {
+    description
+      "Interafce operational state change notification";
+    uses ios-events-ios-xe-oper:interface-oper-state;
+  }
+  notification interface-admin-state-change {
+    description
+      "Interafce admin state change notification";
+    uses ios-events-ios-xe-oper:interface-admin-state;
+  }
+  notification dhcp-server-state-change {
+    description
+      "DHCP server state change notification";
+    uses ios-events-ios-xe-oper:dhcp-server-state;
+  }
+  notification system-reboot-complete {
+    description
+      "System reboot complete notification";
+    uses ios-events-ios-xe-oper:system-reboot-complete;
+  }
+  notification q-flash-fault {
+    description
+      "Flash fault notification";
+    uses ios-events-ios-xe-oper:flash-fault;
+  }
+  notification q-emmc-fault {
+    description
+      "Emmc fault notification";
+    uses ios-events-ios-xe-oper:emmc-fault;
+  }
+  notification q-sdcard-fault {
+    description
+      "Sdcard fault notification";
+    uses ios-events-ios-xe-oper:sdcard-fault;
+  }
+  notification q-tempsensor-fault {
+    description
+      "Tempsensor fault notification";
+    uses ios-events-ios-xe-oper:tempsensor-fault;
+  }
+  notification q-tempsensor-state {
+    description
+      "Tempsensor state notification";
+    uses ios-events-ios-xe-oper:tempsensor-state;
+  }
+  notification q-fan-fault {
+    description
+      "Fan fault notification";
+    uses ios-events-ios-xe-oper:fan-fault;
+  }
+  notification q-fantray-fault {
+    description
+      "Fan tray notification";
+    uses ios-events-ios-xe-oper:fantray-fault;
+  }
+  notification q-pem-fault {
+    description
+      "PEM fault notification";
+    uses ios-events-ios-xe-oper:pem-fault;
+  }
+  notification q-pem-state-change {
+    description
+      "PEM state change notification";
+    uses ios-events-ios-xe-oper:pem-state-change;
+  }
+  notification q-pim-fault {
+    description
+      "PIM fault notification";
+    uses ios-events-ios-xe-oper:pim-fault;
+  }
+  notification q-pim-state-change {
+    description
+      "PIM state change notification";
+    uses ios-events-ios-xe-oper:pim-state-change;
+  }
+  notification q-sfp-state-change {
+    description
+      "SFP state change notification";
+    uses ios-events-ios-xe-oper:sfp-state-change;
+  }
+  notification q-sfp-support-state {
+    description
+      "SFP support state notification";
+    uses ios-events-ios-xe-oper:sfp-support-state;
+  }
+  notification q-usb-state-change {
+    description
+      "USB state change notification";
+    uses ios-events-ios-xe-oper:usb-state-change;
+  }
+  notification system-reboot-issued {
+    description
+      "System reboot issued notification";
+    uses ios-events-ios-xe-oper:system-reboot-issued;
+  }
+  notification disk-usage {
+    description
+      "Disk usage notification";
+    uses ios-events-ios-xe-oper:disk-usage;
+  }
+  container ios-events {
+    config false;
+    description
+      "Events generated from IOS features";
+  }
+}

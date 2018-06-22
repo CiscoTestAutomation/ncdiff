@@ -1,0 +1,273 @@
+module Cisco-IOS-XE-device-hardware-oper {
+  yang-version 1;
+  namespace "http://cisco.com/ns/yang/Cisco-IOS-XE-device-hardware-oper";
+  prefix device-hardware-xe-oper;
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Cisco Systems, Inc.";
+  contact
+    "Cisco Systems, Inc.
+     Customer Service
+     
+     Postal: 170 W Tasman Drive
+     San Jose, CA 95134
+     
+     Tel: +1 1800 553-NETS
+     
+     E-mail: cs-yang@cisco.com";
+  description
+    "This module contains a collection of YANG definitions
+     for Device Hardware operational data.
+     Copyright (c) 2017 by Cisco Systems, Inc.
+     All rights reserved.";
+
+  revision 2017-11-01 {
+    description
+      "Initial revision";
+    reference "1.0.0";
+  }
+
+  typedef hw-type {
+    type enumeration {
+      enum "HW_TYPE_UNKNOWN" {
+        value 0;
+        description
+          "Unknown Hardware Type";
+      }
+      enum "HW_TYPE_CHASSIS" {
+        value 1;
+        description
+          "Chassis";
+      }
+      enum "HW_TYPE_CPU" {
+        value 2;
+        description
+          "Central Processing Unit";
+      }
+      enum "HW_TYPE_DRAM" {
+        value 3;
+        description
+          "Dynamic Random Access Memory";
+      }
+      enum "HW_TYPE_FLASH" {
+        value 4;
+        description
+          "Flash";
+      }
+      enum "HW_TYPE_EMMC" {
+        value 5;
+        description
+          "embedded Memory Controller";
+      }
+      enum "HW_TYPE_SDCARD" {
+        value 6;
+        description
+          "SD-Card";
+      }
+      enum "HW_TYPE_USB" {
+        value 7;
+        description
+          "Universal Serial Bus";
+      }
+      enum "HW_TYPE_PIM" {
+        value 8;
+        description
+          "Pluggable interface model";
+      }
+      enum "HW_TYPE_TRANSCEIVER" {
+        value 9;
+        description
+          "Transceiver";
+      }
+      enum "HW_TYPE_FANTRAY" {
+        value 10;
+        description
+          "Fan tray";
+      }
+      enum "HW_TYPE_PEM" {
+        value 11;
+        description
+          "Power Entry Module";
+      }
+    }
+    description
+      "The broad type of hardware device";
+  }
+
+  typedef alarm-severity {
+    type enumeration {
+      enum "ALARM_SEVERITY_CRITICAL" {
+        value 0;
+        description
+          "Critical Alarms";
+      }
+      enum "ALARM_SEVERITY_MAJOR" {
+        value 1;
+        description
+          "Major Alarms";
+      }
+      enum "ALARM_SEVERITY_MINOR" {
+        value 2;
+        description
+          "Minor Alarms";
+      }
+    }
+    description
+      "Alarm severity";
+  }
+
+  grouping hw-alarm-key {
+    description
+      "The key to the hardware table";
+    leaf alarm-id {
+      type uint32;
+      description
+        "The Alarm Identifier";
+    }
+    leaf alarm-instance {
+      type uint32;
+      description
+        "The instance of this alarm. This corresponds to the 
+         entity index";
+    }
+  }
+
+  grouping hw-alarm {
+    description
+      "The alarm information";
+    leaf alarm-name {
+      type string;
+      description
+        "The name of the alarm";
+    }
+    leaf alarm-category {
+      type device-hardware-xe-oper:alarm-severity;
+      description
+        "The catagory (or severity) of the alarm that is being asserted";
+    }
+    leaf alarm-time {
+      type yang:date-and-time;
+      description
+        "Time the alarm was raised";
+    }
+    leaf alarm-description {
+      type string;
+      description
+        "Description of the alarm";
+    }
+  }
+
+  grouping device-system-data {
+    description
+      "Device system data";
+    leaf current-time {
+      type yang:date-and-time;
+      description
+        "Current time on device in UTC";
+    }
+    leaf boot-time {
+      type yang:date-and-time;
+      description
+        "Time that the device was boot in UTC";
+    }
+    leaf software-version {
+      type string;
+      description
+        "Software version";
+    }
+    leaf rommon-version {
+      type string;
+      description
+        "Rommon version";
+    }
+    leaf last-reboot-reason {
+      type string;
+      description
+        "Last reboot reason";
+    }
+  }
+
+  grouping device-inventory-key {
+    description
+      "Key to the device inventory";
+    leaf hw-type {
+      type device-hardware-xe-oper:hw-type;
+      description
+        "Type of the hardware being represented";
+    }
+    leaf hw-dev-index {
+      type uint32;
+      description
+        "The physical index of the inventory item";
+    }
+  }
+
+  grouping device-inventory {
+    description
+      "inventory";
+    leaf version {
+      type string;
+      description
+        "Version of this device";
+    }
+    leaf part-number {
+      type string;
+      description
+        "The part number of this device. This 
+         is only valid if the device is a field replaceable
+         unit";
+    }
+    leaf serial-number {
+      type string;
+      description
+        "The serial number of the device. This is only
+         valid if the device is individually trackable";
+    }
+    leaf hw-description {
+      type string;
+      description
+        "Description of the device";
+    }
+  }
+
+  grouping device-hardware {
+    description
+      "Device hardware";
+    list device-inventory {
+      key "hw-type hw-dev-index";
+      description
+        "All the inventory in the hardware";
+      uses device-hardware-xe-oper:device-inventory-key;
+      uses device-hardware-xe-oper:device-inventory;
+    }
+    list device-alarm {
+      key "alarm-id alarm-instance";
+      description
+        "The current alarms";
+      uses device-hardware-xe-oper:hw-alarm-key;
+      uses device-hardware-xe-oper:hw-alarm;
+    }
+    container device-system-data {
+      presence "device-system-data";
+      description
+        "The current device system data";
+      uses device-hardware-xe-oper:device-system-data;
+    }
+  }
+
+  container device-hardware-data {
+    config false;
+    description
+      "Device Hardware";
+    container device-hardware {
+      presence "device-hardware";
+      description
+        "The device hardware model";
+      uses device-hardware-xe-oper:device-hardware;
+    }
+  }
+}

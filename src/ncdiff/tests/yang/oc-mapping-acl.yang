@@ -1,0 +1,309 @@
+module oc-mapping-acl {
+
+  yang-version "1";
+
+  // namespace
+  namespace "http://openconfig.net/yang/oc-mapping-acl";
+
+  prefix "oc-map-acl";
+
+  import ietf-inet-types { prefix inet; }
+  import openconfig-yang-types { prefix oc-types; }
+  import openconfig-interfaces { prefix oc-if; }
+  import openconfig-acl { prefix oc-acl; }
+  import openconfig-extensions { prefix oc-ext; }
+
+  // meta
+  organization "OpenConfig working group";
+
+  contact
+    "OpenConfig working group
+    www.openconfig.net";
+
+  description
+    "This module defines mapping state data
+    that must be saved to implement the openconfig-acl
+    model because the capabilities are not implemented
+    on XE devices";
+
+  oc-ext:openconfig-version "0.2.0";
+
+  revision 2017-05-26 {
+    description
+      "L2 ACL native model rewritten";
+  }
+
+  revision "2017-05-02" {
+    description
+      "L2 ACL updated to reflect the native model";
+  }
+
+  revision "2017-05-01" {
+    description
+      "Implement union for acl-name and set-name";
+    reference "TBD";
+  }
+
+  revision "2017-01-17" {
+    description
+      "Initial revision";
+    reference "TBD";
+  }
+
+  // grouping statements
+
+  // input interface
+  grouping input-interface-config {
+    description
+      "Config of interface";
+  }
+
+  // Access List Entries
+  grouping access-list-entries-config {
+    description
+      "Access List Entries (ACE) config.";
+
+    leaf sequence-id {
+      type uint32;
+      description
+        "The sequence id determines the order in which ACL entries
+        are applied.  The sequence id must be unique for each entry
+        in an ACL set.  Target devices should apply the ACL entry
+        rules in the order determined by sequence id, rather than
+        the relying only on order in the list.";
+    }
+
+  }
+
+  typedef mac-address {
+    type oc-types:mac-address;
+  }
+
+  grouping access-list-entries-top {
+    description
+      "Access list entries to level container";
+
+    container acl-entries {
+      description
+        "Access list entries container";
+
+      list acl-entry {
+        key "sequence-id";
+        description
+          "List of ACL entries comprising an ACL set";
+
+        uses access-list-entries-config;
+        leaf type {
+          type identityref {
+            base oc-acl:ACL_TYPE;
+          }
+           description
+               "IP version of the header.";
+        }
+        container l2 {
+          description
+            "Mapping back references to the native mac acl list entries";
+          leaf action {
+            type enumeration {
+              enum deny;
+              enum permit;
+            }
+          }
+          leaf source {
+            type mac-address;
+            default 00:00:00:00:00:00;
+          }
+          leaf source-mask {
+            type mac-address;
+          }
+          leaf dest {
+            type mac-address;
+            default 00:00:00:00:00:00;
+          }
+          leaf dest-mask {
+            type mac-address;
+          }
+          leaf ethertype {
+            type uint16;
+          }
+          leaf active {
+            description
+              "If does not exist, corresponding mac entry could not be created
+               due to duplicates";
+            type empty;
+          }
+        }
+      }
+    }
+  }
+
+  grouping acl-config {
+    description
+      "Global configuration data for ACLs";
+  }
+
+  grouping acl-set-top {
+    description
+      "Access list entries variables top level container";
+
+    container acl-sets {
+      description
+        "Access list entries variables enclosing container";
+
+      list acl-set {
+        key "name";
+        description
+          "List of ACL sets, each comprising of a list of ACL
+          entries";
+         
+        leaf name {
+          type union { 
+            type string;
+            type uint16;
+          }
+          description
+            "Reference to the name list key";
+        }
+
+        container config {
+          description
+            "Access list config";
+          uses acl-set-config;
+          uses access-list-entries-top;
+        }
+
+      }
+    }
+  }
+
+  grouping interface-acl-entries-config {
+    description
+      "Configuration data for per-interface ACLs";
+
+  }
+
+  grouping acl-set-config {
+    description
+      "Access Control List config";
+
+    leaf name {
+      type union { 
+        type string;
+        type uint16;
+      }
+    }
+
+    leaf type {
+      type identityref {
+        base oc-acl:ACL_TYPE;
+      }
+      description
+        "The type of the access-list set";
+    }
+
+    leaf description {
+      type string;
+      description
+        "Description, or comment, for the ACL set";
+    }
+
+  }
+
+  grouping interface-acl-entries-top {
+    description
+      "Top-level grouping for per-interface ACL entries";
+
+    container acl-entries {
+      config false;
+      description
+        "Enclosing container for list of references to ACLs";
+
+      list acl-entry {
+        key "sequence-id";
+        description
+          "List of ACL entries assigned to an interface";
+
+      leaf sequence-id {
+        type string;
+        description
+          "Reference to per-interface acl entry key";
+      }
+
+        // no config container since the enclosing container is
+        // read-only
+
+      }
+    }
+  }
+
+  grouping acl-interfaces-config {
+    description
+      "Configuration data for interface references";
+
+    leaf id {
+      type oc-if:interface-id;
+      description
+        "User-defined identifier for the interface -- a common
+        convention could be '<if name>.<subif index>'";
+    }
+  }
+
+  grouping acl-interfaces-top {
+    description
+      "Top-level grouping for interface-specific ACL data";
+
+    container interfaces {
+      description
+        "Enclosing container for the list of interfaces on which
+        ACLs are set";
+
+      list interface {
+        key "id";
+        description
+          "List of interfaces on which ACLs are set";
+
+        leaf id {
+          type string;
+          description
+            "Reference to the interface id list key";
+        }
+
+        container config {
+          description
+            "Configuration for ACL per-interface data";
+
+          uses acl-interfaces-config;
+        }
+
+
+        uses oc-if:interface-ref;
+      }
+    }
+  }
+
+
+  grouping acl-top {
+    description
+      "Top level grouping for ACL data and structure";
+
+    container acl-mapping {
+      description
+        "Top level enclosing container for ACL model config
+        and operational state data";
+
+      uses acl-config;
+      uses acl-set-top;
+      uses acl-interfaces-top;
+    }
+  }
+
+  // data definition statements
+  uses acl-top;
+
+  // augment statements
+
+  // rpc statements
+
+  // notification statements
+
+}
