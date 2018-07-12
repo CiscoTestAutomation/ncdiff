@@ -376,12 +376,11 @@ class Config(object):
             if len(child) > 0:
                 self._validate_node(child)
 
-            # clean up empty containers
+            # clean up empty NP containers
             child_schema_node = self.device.get_schema_node(child)
             if len(child) == 0 and \
                child_schema_node.get('type') == 'container' and \
                child_schema_node.get('presence') != 'true':
-#               print(self.device.get_xpath(child))
                 node.remove(child)
 
     def _node_filter(self, node, ancestors, filtrates):

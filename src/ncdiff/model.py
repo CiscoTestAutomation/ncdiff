@@ -64,24 +64,48 @@ class Model(object):
         self.width = {}
 
     def __str__(self):
-        ret = []
-        ret.append('module: {}'.format(self.tree.tag))
-        ret += self.emit_children(type='other')
-        rpc_lines = self.emit_children(type='rpc')
-        if rpc_lines:
-            ret += ['', '  rpcs:'] + rpc_lines
-        notification_lines = self.emit_children(type='notification')
-        if notification_lines:
-            ret += ['', '  notifications:'] + notification_lines
-        return '\n'.join(ret)
+        return self.emit_tree(self.tree)
 
-    def emit_children(self, type='other'):
-        '''emit_children
+    def emit_tree(self, tree):
+        '''emit_tree
 
         High-level api: Emit a string presentation of the model.
 
         Parameters
         ----------
+
+        tree : `Element`
+            The model.
+
+        Returns
+        -------
+
+        str
+            A string presentation of the model that is very similar to the
+            output of 'pyang -f tree'
+        '''
+
+        ret = []
+        ret.append('module: {}'.format(tree.tag))
+        ret += self.emit_children(tree, type='other')
+        rpc_lines = self.emit_children(tree, type='rpc')
+        if rpc_lines:
+            ret += ['', '  rpcs:'] + rpc_lines
+        notification_lines = self.emit_children(tree, type='notification')
+        if notification_lines:
+            ret += ['', '  notifications:'] + notification_lines
+        return '\n'.join(ret)
+
+    def emit_children(self, tree, type='other'):
+        '''emit_children
+
+        High-level api: Emit a string presentation of a part of the model.
+
+        Parameters
+        ----------
+
+        tree : `Element`
+            The model.
 
         type : `str`
             Type of model content required. Its value can be 'other', 'rpc', or
@@ -106,7 +130,7 @@ class Model(object):
             return True
 
         ret = []
-        for root in [i for i in self.tree.getchildren() if is_type(i, type)]:
+        for root in [i for i in tree.getchildren() if is_type(i, type)]:
             for i in root.iter():
                 line = self.get_depth_str(i, type=type)
                 name_str = self.get_name_str(i)
@@ -714,12 +738,22 @@ class ModelDiff(object):
     tree : `Element`
         The model difference tree as an Element object.
 
+    added : `str`
+        A string presentation of added nodes from model1 to model2.
+
+    deleted : `str`
+        A string presentation of deleted nodes from model1 to model2.
+
+    modified : `str`
+        A string presentation of modified nodes from model1 to model2.
+
     width : `dict`
         This is used to facilitate pretty print of a model. Dictionary keys are
         nodes in the model tree, and values are indents.
     '''
 
     __str__ = Model.__str__
+    emit_tree = Model.emit_tree
     get_width = Model.get_width
 
     def __init__(self, model1, model2):
@@ -745,13 +779,89 @@ class ModelDiff(object):
         else:
             return False
 
-    def emit_children(self, type='other'):
-        '''emit_children
+    @property
+    def added(self):
+        tree_added = deepcopy(self.tree)
+        if self.trim(tree_added, 'added'):
+            return None
+        else:
+            return self.emit_tree(tree_added)
 
-        High-level api: Emit a string presentation of the model.
+    @property
+    def deleted(self):
+        tree_deleted = deepcopy(self.tree)
+        if self.trim(tree_deleted, 'deleted'):
+            return None
+        else:
+            return self.emit_tree(tree_deleted)
+
+    @property
+    def modified(self):
+        tree_modified = deepcopy(self.tree)
+        if self.trim(tree_modified, 'modified'):
+            return None
+        else:
+            return self.emit_tree(tree_modified)
+
+    def compare(self, xpath):
+        '''compare
+
+        High-level api: Return a string presentation of comparison between the
+        node in model1 and model2.
 
         Parameters
         ----------
+
+        xpath : `str`
+            XPATH to locate a node.
+
+        Returns
+        -------
+
+        str
+            A string presentation of comparison.
+        '''
+
+        def print_node(node_list):
+            if not node_list:
+                return 'None'
+            node = node_list[0]
+            ret = ["tag: '{}'".format(node.tag),
+                   "text: {}".format(print_value(node.text)),
+                   "attributes:"]
+            for a, v in node.attrib.items():
+                ret.append("  {} = {}".format(a, print_value(v)))
+            return '\n'.join(ret)
+
+        def print_value(value):
+            if value is None:
+                return 'None'
+            else:
+                return "'{}'".format(value)
+
+        prefixes = deepcopy(self.model1.prefixes)
+        prefixes.update(self.model2.prefixes)
+        node1_list = self.model1.tree.xpath(xpath, namespaces=prefixes)
+        node2_list = self.model2.tree.xpath(xpath, namespaces=prefixes)
+        return '\n'.join(['-'*21 + ' XPATH ' + '-'*21,
+                          "'{}'".format(xpath),
+                          '-'*20 + ' MODEL 1 ' + '-'*20,
+                          print_node(node1_list),
+                          '-'*20 + ' MODEL 2 ' + '-'*20,
+                          print_node(node2_list),
+                          '-'*49,
+                          ''])
+
+    def emit_children(self, tree, type='other'):
+        '''emit_children
+
+        High-level api: Emit a string presentation of a part of the model.
+
+        Parameters
+        ----------
+
+        tree : `Element`
+            The model.
 
         type : `str`
             Type of model content required. Its value can be 'other', 'rpc', or
@@ -762,7 +872,7 @@ class ModelDiff(object):
 
         str
             A string presentation of the model that is very similar to the
-            output of 'pyang -f tree'
+            output of 'pyang -f tree'.
         '''
 
         def is_type(element, type):
@@ -776,7 +886,7 @@ class ModelDiff(object):
             return True
 
         ret = []
-        for root in [i for i in self.tree.getchildren() if is_type(i, type)]:
+        for root in [i for i in tree.getchildren() if is_type(i, type)]:
             for i in root.iter():
                 line = Model.get_depth_str(i, type=type)
                 name_str = self.get_name_str(i)
@@ -941,8 +1051,7 @@ class ModelDiff(object):
         '''process_attrib
 
         High-level api: Delete four attributes from an ElementTree node if they
-        exist: operation, insert, value and key. Then a new attribute 'diff' is
-        added.
+        exist: operation, insert, etc. Then a new attribute 'diff' is added.
 
         Parameters
         ----------
@@ -960,10 +1069,12 @@ class ModelDiff(object):
             Argument 'element' is returned after processing.
         '''
 
-        attrib_required = ['type', 'access', 'mandatory']
+        known_attrib = ['type', 'access', 'mandatory', 'presence', 'values',
+                        'key', 'is_key', 'prefix', 'datatype', 'if-feature',
+                        'ordered-by', 'default']
         for node in element.iter():
             for attrib in node.attrib.keys():
-                if attrib not in attrib_required:
+                if attrib not in known_attrib:
                     del node.attrib[attrib]
             if msg:
                 node.attrib['diff'] = msg
@@ -1050,7 +1161,7 @@ class ModelDiff(object):
             True if all descendants of node1 exist in node2, otherwise False.
         '''
 
-        for x in ['tag', 'text', 'tail']:
+        for x in ['tag', 'text']:
             if node1.__getattribute__(x) != node2.__getattribute__(x):
                 return False
         for a in node1.attrib:
@@ -1067,3 +1178,39 @@ class ModelDiff(object):
                 if not ModelDiff.node_less(child, peers[0]):
                     return False
         return True
+
+    @staticmethod
+    def trim(parent, msg):
+        '''trim
+
+        Low-level api: Return True if parent has no child after trimming. The
+        trimming to filter out one type of diff: added, deleted, or modified.
+
+        Parameters
+        ----------
+
+        parent : `Element`
+            A node in a model tree.
+
+        msg : `str`
+            A type of diff: added, deleted, or modified.
+
+        Returns
+        -------
+
+        bool
+            True if parent has no child after trimming.
+        '''
+
+        for child in list(parent):
+            diff = child.get('diff')
+            type = child.get('type')
+            if diff and diff != msg:
+                parent.remove(child)
+            elif type == 'container' or \
+                 type == 'list' or \
+                 type == 'choice' or \
+                 type == 'case':
+                if ModelDiff.trim(child, msg):
+                    parent.remove(child)
+        return len(list(parent)) == 0

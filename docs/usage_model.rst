@@ -63,5 +63,47 @@ Simply print out the ModelDiff object:
     ...
     >>>
 
+Attributes 'added', 'deleted' and 'modified' are string presentations of the
+diff for added, deleted and modified nodes respectively:
+
+.. code-block:: text
+
+    >>> print(diff.modified)
+    module: Cisco-IOS-XE-native
+        +--rw native
+           +--rw parser
+           |  +--rw view
+           |     +--rw view-name-list*
+           |     |  +--rw secret
+           |     |     +--rw type?    modified
+    ...
+    >>>
+
+From curiosity, one wants to see the difference of one node:
+
+.. code-block:: text
+
+    >>> print(diff.compare('//ios:native/ios:parser/ios:view/ios:view-name-list/ios:secret/ios:type'))
+    --------------------- XPATH ---------------------
+    '//ios:native/ios:parser/ios:view/ios:view-name-list/ios:secret/ios:type'
+    -------------------- MODEL 1 --------------------
+    tag: '{http://cisco.com/ns/yang/Cisco-IOS-XE-native}type'
+    text: None
+    attributes:
+      access = 'read-write'
+      datatype = 'enumeration'
+      type = 'leaf'
+      values = '0|5'
+    -------------------- MODEL 2 --------------------
+    tag: '{http://cisco.com/ns/yang/Cisco-IOS-XE-native}type'
+    text: None
+    attributes:
+      access = 'read-write'
+      datatype = 'enumeration'
+      type = 'leaf'
+      values = '5'
+    -------------------------------------------------
+    >>>
+
 
 .. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>

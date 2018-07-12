@@ -64,8 +64,8 @@ ConfigDelta     \-          Config          =           N/A             Not impl
 
 Support Mailers
 ===============
-Users are encouraged to contribute to yang.ncdiff module as expertise of data
-model testing grows in Cisco. Any questions or requests may be sent to
+Users are encouraged to contribute to ncdiff module as expertise of data model
+testing grows in Cisco. Any questions or requests may be sent to
 yang-python@cisco.com.
 
 
@@ -89,8 +89,7 @@ Usage Examples
 Installation
 ============
 
-yang.ncdiff module requires a few packages. Some of them are required
-implicitly:
+ncdiff module requires a few packages. Some of them are required implicitly:
 
 * `lxml <http://lxml.de/index.html>`_ (required by ncclient)
 * `paramiko <https://pypi.org/project/paramiko/>`_ (required by ncclient)
