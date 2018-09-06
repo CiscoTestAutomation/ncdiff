@@ -623,6 +623,7 @@ class ModelCompiler(object):
 
         self.pyang_plugins = os.path.dirname(__file__) + '/plugins'
         self.dir_yang = os.path.abspath(folder)
+        self.pyang_errors = {}
         self.build_dependencies()
 
     def build_dependencies(self):
@@ -646,7 +647,8 @@ class ModelCompiler(object):
         p = Popen(' '.join(cmd_list), shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         logger.info('pyang return code is {}'.format(p.returncode))
-        logger.debug(stderr.decode())
+        self.pyang_errors['all'] = stderr.replace(b'"\\\n"', b'"\\n"').decode()
+        logger.warning(self.pyang_errors['all'])
         parser = etree.XMLParser(remove_blank_text=True)
         self.dependencies = etree.XML(stdout.decode(), parser)
 
@@ -711,10 +713,11 @@ class ModelCompiler(object):
         p = Popen(' '.join(cmd_list), shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         logger.info('pyang return code is {}'.format(p.returncode))
+        self.pyang_errors[module] = stderr.replace(b'"\\\n"', b'"\\n"').decode()
         if p.returncode == 0:
-            logger.debug(stderr.decode())
+            logger.debug(self.pyang_errors[module])
         else:
-            logger.error(stderr.decode())
+            logger.error(self.pyang_errors[module])
         parser = etree.XMLParser(remove_blank_text=True)
         tree = etree.XML(stdout.decode(), parser)
         return Model(tree)

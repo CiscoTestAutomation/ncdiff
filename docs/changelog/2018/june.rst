@@ -7,7 +7,7 @@ June 22
 .. csv-table:: Module Versions
     :header: "Modules", "Versions"
 
-        ``yang.ncdiff``, v2.0.1
+        ``ncdiff``, v2.0.1
 
 Features:
 ^^^^^^^^^
