@@ -1,5 +1,5 @@
-yang.ncdiff
-===========
+ncdiff
+======
 
 A package containing a set of classes that calculate diff of two configs,
 combine two configs or two diffs, and predict config when a diff is applied to

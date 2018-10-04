@@ -46,5 +46,3 @@ Other sub-modules are for internal consumption:
    api_composer
    api_calculator
    api_netconf
-   api_restconf
-   api_gnmi

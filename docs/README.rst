@@ -1,4 +1,4 @@
-.. _yang.ncdiff:
+.. _ncdiff:
 
 
 Introduction
@@ -37,11 +37,9 @@ Features
   device to toggle between config state A and B
 * Given a config state and an edit-config, calculate the new config state
 * Support XPATH on Config and RPCReply
-* Instantiate Config objects by Netconf rpc-reply, Restconf GET reply or gNMI
-  GetResponse
+* Instantiate Config objects by Netconf rpc-reply
 * Present ConfigDelta objects in the form of Netconf (a config content of
-  edit-config), Restconf (a list of Restconf Requests), or gNMI (a gNMI
-  SetRequest).
+  edit-config).
 
 Config Operations
 -----------------
@@ -75,10 +73,6 @@ Usage Examples
 .. toctree::
 
    usage_tutorial
-   usage_rc_put
-   usage_rc_get
-   usage_gnmi_set
-   usage_gnmi_get
    usage_config
    usage_configdelta
    usage_model
@@ -98,10 +92,6 @@ Others are required directly:
 
 * `ncclient <http://ncclient.readthedocs.io/en/latest/>`_
 * `pyang <https://pypi.org/project/pyang/>`_
-* `requests <https://pypi.org/project/requests/>`_
-* `grpcio <https://pypi.org/project/grpcio/>`_
-* `grpcio-tools <https://pypi.org/project/grpcio-tools/>`_
-* `xmljson <https://pypi.org/project/xmljson/>`_
 
 Installation of these packages are normally smooth. Based on our support
 experience, most issues are related to lxml and paramiko.

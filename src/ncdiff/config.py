@@ -5,15 +5,11 @@ import logging
 from lxml import etree
 from copy import deepcopy
 from ncclient import operations, xml_
-from requests import Request, Response
 
-from .gnmi import gNMIParser, gNMICalculator
 from .model import ModelDiff
 from .errors import ConfigError, ModelMissing, ModelIncompatible
 from .netconf import NetconfParser, NetconfCalculator
 from .composer import Composer
-from .gnmi_pb2 import SetRequest, GetResponse
-from .restconf import RestconfParser, RestconfCalculator
 from .calculator import BaseCalculator
 
 # create a logger for this module
@@ -378,6 +374,10 @@ class Config(object):
 
             # clean up empty NP containers
             child_schema_node = self.device.get_schema_node(child)
+            if child_schema_node is None:
+                raise ConfigError("schema node of the config node {} cannot " \
+                                  "be found:\n{}" \
+                                  .format(self.device.get_xpath(child), self))
             if len(child) == 0 and \
                child_schema_node.get('type') == 'container' and \
                child_schema_node.get('presence') != 'true':
@@ -457,15 +457,6 @@ class ConfigDelta(object):
         ncclient edit_config() directly. It is the Netconf presentation of a
         ConfigDelta instance.
 
-    rc : `list`
-        A list of requests.models.Request instances. Each Request instance can
-        be used by prepare_request() in requests package. It is the Restconf
-        presentation of a ConfigDelta instance.
-
-    gnmi : `dict`
-        A gnmi_pb2.SetRequest instance. It is the gNMI presentation of a
-        ConfigDelta instance.
-
     ns : `dict`
         A dictionary of namespaces used by the attribute 'nc'. Keys are prefixes
         and values are URLs.
@@ -521,13 +512,10 @@ class ConfigDelta(object):
         if delta is not None:
             if isinstance(delta, str) or etree.iselement(delta):
                 delta = NetconfParser(self.device, delta).ele
-            elif isinstance(delta, Request) or isinstance(delta, SetRequest):
-                delta = delta
             else:
                 raise TypeError("argument 'delta' must be XML string, " \
-                                "Element, requests.Request, or " \
-                                "gnmi_pb2.SetRequest, but not " \
-                                "'{}'".format(type(delta)))
+                                "Element, but not '{}'" \
+                                .format(type(delta)))
         if not isinstance(config_dst, Config) and config_dst is not None:
             raise TypeError("argument 'config_dst' must be " \
                             "yang.ncdiff.Config or None, but not '{}'" \
@@ -554,16 +542,6 @@ class ConfigDelta(object):
                                  preferred_create=self.preferred_create,
                                  preferred_replace=self.preferred_replace,
                                  preferred_delete=self.preferred_delete).sub
-
-    @property
-    def rc(self):
-        return RestconfCalculator(self.device,
-                                  self.config_dst.ele, self.config_src.ele).sub
-
-    @property
-    def gnmi(self):
-        return gNMICalculator(self.device,
-                              self.config_dst.ele, self.config_src.ele).sub
 
     @property
     def ns(self):

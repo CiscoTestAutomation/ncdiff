@@ -167,10 +167,6 @@ setup(
     install_requires =  [
         'ncclient >= 0.5.3',
         'pyang >= 1.7.3',
-        'xmljson >= 0.1.9',
-        'requests >= 2.18.4',
-        'grpcio >= 1.7.3',
-        'grpcio-tools >= 1.7.3',
     ],
 
     # any additional groups of dependencies.

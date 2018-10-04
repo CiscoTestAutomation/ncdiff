@@ -1,7 +1,7 @@
 Tutorial
 ========
 
-Here are some basic usage examples of yang.ncdiff. They are organized in the
+Here are some basic usage examples of ncdiff. They are organized in the
 sequence of a typical use case - connect device, load models, get or get-config,
 and edit-config.
 
