@@ -50,8 +50,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Cisco-Shared (pyATS)'
-copyright = '2014-2018, ATS-ASG Team, Cisco Internal Confidential'
+project = 'ncdiff'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

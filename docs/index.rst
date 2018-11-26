@@ -9,7 +9,6 @@ can be considered as the payload of an edit-config message.
 .. toctree::
 
    README
-   apidocs
    changelog/index
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

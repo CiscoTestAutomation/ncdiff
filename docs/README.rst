@@ -60,13 +60,6 @@ ConfigDelta     \-          Config          =           N/A             Not impl
 =============   =========   =============   =========   =============   ==============================
 
 
-Support Mailers
-===============
-Users are encouraged to contribute to ncdiff module as expertise of data model
-testing grows in Cisco. Any questions or requests may be sent to
-yang-python@cisco.com.
-
-
 Usage Examples
 ==============
 
@@ -94,53 +87,7 @@ Others are required directly:
 * `pyang <https://pypi.org/project/pyang/>`_
 
 Installation of these packages are normally smooth. Based on our support
-experience, most issues are related to lxml and paramiko.
-
-lxml Installation
------------------
-
-lxml package is available on Internet so your server may need proxy setup to
-access external sites.
-
-.. code-block:: text
-
-    pip install lxml
-
-.. note::
-
-    Depending on your system of 32-bit or 64-bit python, some other packages
-    need to be installed first. Please refer to some instructions in
-    `YDK Installation <https://wiki.cisco.com/display/PYATS/YDK#YDK-Installation>`_
-    as YDK has very similar dependencies. Another useful resource is
-    `PieStack <http://piestack.cisco.com/>`_
-
-Verify whether lxml installation is successful (you are on the good path if you
-do not see any error):
-
-.. code-block:: text
-
-    bash$ python
-    Python 3.4.1 (default, Jul 20 2016, 07:21:38)
-    [GCC 4.4.7 20120313 (Red Hat 4.4.7-16)] on linux
-    Type "help", "copyright", "credits" or "license" for more information.
-    >>> from lxml import etree
-    >>>
-
-paramiko Installation
----------------------
-
-When you have a relatively new version of CEL on your server, paramiko
-installation could be straight forward.
-
-.. code-block:: text
-
-    pip install paramiko
-
-If there are errors during installation, try paramiko version 1.15.3:
-
-.. code-block:: text
-
-    pip install paramiko==1.15.3
+experience, most issues are related to lxml and paramiko installation.
 
 ncdiff Installation
 -------------------
@@ -161,4 +108,4 @@ Steps to upgrade to latest:
     pip install --upgrade ncdiff
 
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang
