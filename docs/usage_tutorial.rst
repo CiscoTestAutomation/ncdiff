@@ -213,4 +213,4 @@ Want to switch back to config2? No problem! Send 'delta':
     >>>
 
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

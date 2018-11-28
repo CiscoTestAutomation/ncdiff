@@ -1,6 +1,12 @@
 .. _ncdiff:
 
 
+Package ncdiff is a simplified version of yang.ncdiff. Both were initially
+developed internally in Cisco and is now available to the general public through
+open-source. yang.ncdiff is integrated into the modular architecture of pyATS
+framework, while ncdiff is more lightweight and standalone.
+
+
 Introduction
 ============
 
@@ -92,7 +98,7 @@ experience, most issues are related to lxml and paramiko installation.
 ncdiff Installation
 -------------------
 
-This package can be installed from Cisco pypi server.
+This package can be installed from pypi server.
 
 First-time installation steps:
 
@@ -106,6 +112,3 @@ Steps to upgrade to latest:
 .. code-block:: text
 
     pip install --upgrade ncdiff
-
-
-.. sectionauthor:: Jonathan Yang

@@ -64,4 +64,4 @@ Simply print out the instance of RunningConfigDiff:
     >>>
 
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

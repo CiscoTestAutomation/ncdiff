@@ -106,4 +106,4 @@ From curiosity, one wants to see the difference of one node:
     >>>
 
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

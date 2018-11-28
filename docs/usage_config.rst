@@ -167,4 +167,4 @@ model config of loopback interfaces.
     True
     >>>
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

@@ -36,4 +36,4 @@ make up some prefixes for you.
     >>> reply.ns_help()
     >>>
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang

@@ -123,4 +123,4 @@ If 'preferred_replace' is set to 'merge', we search deep and use either 'merge',
 Both 'delete' and 'remove' are valid options of 'preferred_delete'.
 
 
-.. sectionauthor:: Jonathan Yang <yuekyang@cisco.com>
+.. sectionauthor:: Jonathan Yang
