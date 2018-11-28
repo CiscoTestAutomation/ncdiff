@@ -111,12 +111,11 @@ setup(
     version = find_version('src', pkg_path, '__init__.py'),
 
     # descriptions
-#     description =  'Short description of yang package',
-#     long_description = read('DESCRIPTION.rst'),
+    description = 'A config state diff calculator for NETCONF',
+    long_description = 'A package to generate NETCONF edit-config when two config states are given.',
 
     # the package's documentation page.
-    url = 'http://wwwin-pyats.cisco.com/cisco-shared/html/{}/docs/index.html'.\
-        format(pkg_path),
+    url = 'https://ncdiff.readthedocs.io/en/latest/',
 
     # author details
     author = 'Jonathan Yang',
@@ -124,15 +123,15 @@ setup(
     maintainer_email = 'yang-python@cisco.com',
 
     # project licensing
-    license = 'Cisco Systems, Inc. Cisco Confidential',
+    license = 'Apache 2.0',
 
     # see https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers = [
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
         'Intended Audience :: Developers',
-        'Intended Audience :: Telecommunications Industry'
-        'License :: Other/Proprietary License',
+        'Intended Audience :: Telecommunications Industry',
+        'License :: OSI Approved :: Apache Software License',
         'Operating System :: POSIX :: Linux',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.4',
