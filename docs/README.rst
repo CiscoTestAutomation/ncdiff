@@ -7,6 +7,7 @@ open-source. yang.ncdiff is integrated into the modular architecture of pyATS
 framework, while ncdiff is more lightweight and standalone.
 
 Docs: `https://ncdiff.readthedocs.io/en/latest/ <https://ncdiff.readthedocs.io/en/latest/>`_
+
 GitHub: `https://github.com/CiscoTestAutomation/ncdiff/ <https://github.com/CiscoTestAutomation/ncdiff/>`_
 
 
