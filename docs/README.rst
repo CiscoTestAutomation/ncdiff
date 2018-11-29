@@ -6,6 +6,9 @@ developed internally in Cisco and is now available to the general public through
 open-source. yang.ncdiff is integrated into the modular architecture of pyATS
 framework, while ncdiff is more lightweight and standalone.
 
+Docs: `https://ncdiff.readthedocs.io/en/latest/ <https://ncdiff.readthedocs.io/en/latest/>`_
+GitHub: `https://github.com/CiscoTestAutomation/ncdiff/ <https://github.com/CiscoTestAutomation/ncdiff/>`_
+
 
 Introduction
 ============
@@ -31,7 +34,7 @@ and ConfigDelta.
 * A config state of multiple models - Config
 * A config delta between two configs - ConfigDelta
 
-Quick examples can be found in section Tutorial.
+Quick examples can be found in section `Tutorial <https://ncdiff.readthedocs.io/en/latest/usage_tutorial.html>`_.
 
 Features
 --------

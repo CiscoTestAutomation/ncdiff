@@ -115,7 +115,7 @@ setup(
     long_description = 'A package to generate NETCONF edit-config when two config states are given.',
 
     # the package's documentation page.
-    url = 'https://ncdiff.readthedocs.io/en/latest/',
+    url = 'https://github.com/CiscoTestAutomation/ncdiff.git',
 
     # author details
     author = 'Jonathan Yang',
