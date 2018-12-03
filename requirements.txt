@@ -1,0 +1,2 @@
+ncclient >= 0.5.3
+pyang >= 1.7.3
