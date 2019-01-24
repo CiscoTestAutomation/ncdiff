@@ -432,6 +432,7 @@ class ModelDevice(manager.Manager):
 
         config = Config(self, reply)
         remove_read_only(config.ele)
+        config.validate_config()
         return config
 
     def get_schema_node(self, config_node):
