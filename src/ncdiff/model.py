@@ -540,8 +540,9 @@ class ModelDownloader(object):
             self.download(self.to_be_downloaded.pop())
 
         # write self.yang_capabilities
-        with open(self.yang_capabilities, 'w') as f:
-            f.write('\n'.join(sorted(list(self.device.server_capabilities))))
+        capabilities = '\n'.join(sorted(list(self.device.server_capabilities)))
+        with open(self.yang_capabilities, 'wb') as f:
+            f.write(capabilities.encode('utf-8'))
 
     def download(self, module):
         '''download
@@ -575,8 +576,8 @@ class ModelDownloader(object):
             return
         if reply.ok:
             fname = self.dir_yang + '/' + module + '.yang'
-            with open(fname, 'w') as f:
-                f.write(reply.data)
+            with open(fname, 'wb') as f:
+                f.write(reply.data.encode('utf-8'))
             self.downloaded.add(module)
             imports = set()
             includes = set()
