@@ -199,24 +199,39 @@ class NetconfCalculator(BaseCalculator):
             self._group_kids(node_sum, node_other)
         for child_self in in_s_not_in_o:
             pass
+
         for child_other in in_o_not_in_s:
+            this_operation = child_other.get(operation_tag, default='merge')
+
             # delete
-            if child_other.get(operation_tag) == 'delete':
+            if this_operation == 'delete':
                 raise ConfigDeltaError('data-missing: try to delete node {} ' \
                                        'but it does not exist in config' \
                                        .format(self.device \
                                                    .get_xpath(child_other)))
+
             # remove
-            elif child_other.get(operation_tag) == 'remove':
+            elif this_operation == 'remove':
                 pass
-            # merge, replace, create or none
-            else:
+
+            # merge, create, replace or none
+            elif this_operation == 'merge' or \
+               this_operation == 'replace' or \
+               this_operation == 'create':
                 s_node = self.device.get_schema_node(child_other)
                 if s_node.get('type') in supported_node_type:
                     getattr(self,
                             '_node_add_without_peer_{}' \
                             .format(s_node.get('type').replace('-', ''))) \
                             (node_sum, child_other)
+
+            else:
+                raise ConfigDeltaError("unknown operation: node {} contains " \
+                                       "operation '{}'" \
+                                       .format(self.device \
+                                                   .get_xpath(child_other),
+                                               this_operation))
+
         for child_self, child_other in in_s_and_in_o:
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') in supported_node_type:
@@ -346,8 +361,14 @@ class NetconfCalculator(BaseCalculator):
             There is no return of this method.
         '''
 
-        e = deepcopy(child_other)
-        node_sum.append(self._del_attrib(e))
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation == 'merge':
+            e = etree.SubElement(node_sum, child_other.tag,
+                                 nsmap=child_other.nsmap)
+            self.node_add(e, child_other)
+        elif this_operation == 'replace' or \
+             this_operation == 'create':
+            node_sum.append(self._del_attrib(deepcopy(child_other)))
 
     def _node_add_without_peer_list(self, node_sum, child_other):
         '''_node_add_without_peer_list
@@ -374,21 +395,30 @@ class NetconfCalculator(BaseCalculator):
         '''
 
         s_node = self.device.get_schema_node(child_other)
-        e = deepcopy(child_other)
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation == 'merge':
+            e = etree.Element(child_other.tag, nsmap=child_other.nsmap)
+            for list_key_tag in self._get_list_keys(s_node):
+                key_ele_other = child_other.find(list_key_tag)
+                key_ele_self = deepcopy(key_ele_other)
+                e.append(self._del_attrib(key_ele_self))
+        elif this_operation == 'replace' or \
+             this_operation == 'create':
+            e = self._del_attrib(deepcopy(child_other))
         scope = node_sum.getchildren()
         siblings = self._get_sequence(scope, child_other.tag, node_sum)
         if s_node.get('ordered-by') == 'user' and \
            child_other.get(insert_tag) is not None:
             if child_other.get(insert_tag) == 'first':
                 if siblings:
-                    siblings[0].addprevious(self._del_attrib(e))
+                    siblings[0].addprevious(e)
                 else:
-                    node_sum.append(self._del_attrib(e))
+                    node_sum.append(e)
             elif child_other.get(insert_tag) == 'last':
                 if siblings:
-                    siblings[-1].addnext(self._del_attrib(e))
+                    siblings[-1].addnext(e)
                 else:
-                    node_sum.append(self._del_attrib(e))
+                    node_sum.append(e)
             elif child_other.get(insert_tag) == 'before':
                 if child_other.get(key_tag) is None:
                     _inserterror('before', self.device.get_xpath(child_other),
@@ -400,7 +430,7 @@ class NetconfCalculator(BaseCalculator):
                     path = self.device.get_xpath(child_other)
                     key = child_other.get(key_tag)
                     _inserterror('before', path, 'key', key)
-                sibling.addprevious(self._del_attrib(e))
+                sibling.addprevious(e)
             elif child_other.get(insert_tag) == 'after':
                 if child_other.get(key_tag) is None:
                     _inserterror('after', self.device.get_xpath(child_other),
@@ -412,12 +442,14 @@ class NetconfCalculator(BaseCalculator):
                     path = self.device.get_xpath(child_other)
                     key = child_other.get(key_tag)
                     _inserterror('after', path, 'key', key)
-                sibling.addnext(self._del_attrib(e))
+                sibling.addnext(e)
         else:
             if siblings:
-                siblings[-1].addnext(self._del_attrib(e))
+                siblings[-1].addnext(e)
             else:
-                node_sum.append(self._del_attrib(e))
+                node_sum.append(e)
+        if this_operation == 'merge':
+            self.node_add(e, child_other)
 
     def _node_add_with_peer_leaf(self, child_self, child_other):
         '''_node_add_with_peer_leaf
@@ -444,25 +476,24 @@ class NetconfCalculator(BaseCalculator):
             There is no return of this method.
         '''
 
-        if child_other.get(operation_tag) is None:
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation == 'merge':
             child_self.text = child_other.text
-        elif child_other.get(operation_tag) == 'merge':
+        elif this_operation == 'replace':
             child_self.text = child_other.text
-        elif child_other.get(operation_tag) == 'replace':
-            child_self.text = child_other.text
-        elif child_other.get(operation_tag) == 'create':
+        elif this_operation == 'create':
             raise ConfigDeltaError('data-exists: try to create node {} but ' \
                                    'it already exists' \
                                    .format(self.device.get_xpath(child_other)))
-        elif child_other.get(operation_tag) == 'delete' or \
-             child_other.get(operation_tag) == 'remove':
+        elif this_operation == 'delete' or \
+             this_operation == 'remove':
             parent_self = child_self.getparent()
             parent_self.remove(child_self)
         else:
             raise ConfigDeltaError("unknown operation: node {} contains " \
                                    "operation '{}'" \
                                    .format(self.device.get_xpath(child_other),
-                                           child_other.get(operation_tag)))
+                                           this_operation))
 
     def _node_add_with_peer_leaflist(self, child_self, child_other):
         '''_node_add_with_peer_leaflist
@@ -491,9 +522,9 @@ class NetconfCalculator(BaseCalculator):
 
         parent_self = child_self.getparent()
         s_node = self.device.get_schema_node(child_self)
-        if child_other.get(operation_tag) is None or \
-           child_other.get(operation_tag) == 'merge' or \
-           child_other.get(operation_tag) == 'replace':
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation == 'merge' or \
+           this_operation == 'replace':
             if s_node.get('ordered-by') == 'user' and \
                child_other.get(insert_tag) is not None:
                 if child_other.get(insert_tag) == 'first':
@@ -536,18 +567,18 @@ class NetconfCalculator(BaseCalculator):
                         _inserterror('after', path, 'value', value)
                     if sibling[0] != child_self:
                         sibling[0].addnext(child_self)
-        elif child_other.get(operation_tag) == 'create':
+        elif this_operation == 'create':
             raise ConfigDeltaError('data-exists: try to create node {} but ' \
                                    'it already exists' \
                                    .format(self.device.get_xpath(child_other)))
-        elif child_other.get(operation_tag) == 'delete' or \
-             child_other.get(operation_tag) == 'remove':
+        elif this_operation == 'delete' or \
+             this_operation == 'remove':
             parent_self.remove(child_self)
         else:
             raise ConfigDeltaError("unknown operation: node {} contains " \
                                    "operation '{}'" \
                                    .format(self.device.get_xpath(child_other),
-                                           child_other.get(operation_tag)))
+                                           this_operation))
 
     def _node_add_with_peer_container(self, child_self, child_other):
         '''_node_add_with_peer_container
@@ -575,24 +606,24 @@ class NetconfCalculator(BaseCalculator):
         '''
 
         parent_self = child_self.getparent()
-        if child_other.get(operation_tag) is None or \
-           child_other.get(operation_tag) == 'merge':
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation == 'merge':
             self.node_add(child_self, child_other)
-        elif child_other.get(operation_tag) == 'replace':
-            e = deepcopy(child_other)
-            parent_self.replace(child_self, self._del_attrib(e))
-        elif child_other.get(operation_tag) == 'create':
+        elif this_operation == 'replace':
+            parent_self.replace(child_self,
+                                self._del_attrib(deepcopy(child_other)))
+        elif this_operation == 'create':
             raise ConfigDeltaError('data-exists: try to create node {} but ' \
                                    'it already exists' \
                                    .format(self.device.get_xpath(child_other)))
-        elif child_other.get(operation_tag) == 'delete' or \
-             child_other.get(operation_tag) == 'remove':
+        elif this_operation == 'delete' or \
+             this_operation == 'remove':
             parent_self.remove(child_self)
         else:
             raise ConfigDeltaError("unknown operation: node {} contains " \
                                    "operation '{}'" \
                                    .format(self.device.get_xpath(child_other),
-                                           child_other.get(operation_tag)))
+                                           this_operation))
 
     def _node_add_with_peer_list(self, child_self, child_other):
         '''_node_add_with_peer_list
@@ -621,8 +652,9 @@ class NetconfCalculator(BaseCalculator):
 
         parent_self = child_self.getparent()
         s_node = self.device.get_schema_node(child_self)
-        if child_other.get(operation_tag) != 'delete' and \
-           child_other.get(operation_tag) != 'remove' and \
+        this_operation = child_other.get(operation_tag, default='merge')
+        if this_operation != 'delete' and \
+           this_operation != 'remove' and \
            s_node.get('ordered-by') == 'user' and \
            child_other.get(insert_tag) is not None:
             if child_other.get(insert_tag) == 'first':
@@ -663,24 +695,23 @@ class NetconfCalculator(BaseCalculator):
                     _inserterror('after', path, 'key', key)
                 if sibling != child_self:
                     sibling.addnext(child_self)
-        if child_other.get(operation_tag) is None or \
-           child_other.get(operation_tag) == 'merge':
+        if this_operation == 'merge':
             self.node_add(child_self, child_other)
-        elif child_other.get(operation_tag) == 'replace':
-            e = deepcopy(child_other)
-            parent_self.replace(child_self, self._del_attrib(e))
-        elif child_other.get(operation_tag) == 'create':
+        elif this_operation == 'replace':
+            parent_self.replace(child_self,
+                                self._del_attrib(deepcopy(child_other)))
+        elif this_operation == 'create':
             raise ConfigDeltaError('data-exists: try to create node {} but ' \
                                    'it already exists' \
                                    .format(self.device.get_xpath(child_other)))
-        elif child_other.get(operation_tag) == 'delete' or \
-             child_other.get(operation_tag) == 'remove':
+        elif this_operation == 'delete' or \
+             this_operation == 'remove':
             parent_self.remove(child_self)
         else:
             raise ConfigDeltaError("unknown operation: node {} contains " \
                                    "operation '{}'" \
                                    .format(self.device.get_xpath(child_other),
-                                           child_other.get(operation_tag)))
+                                           this_operation))
 
     def node_sub(self, node_self, node_other):
         '''node_sub

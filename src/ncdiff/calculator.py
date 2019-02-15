@@ -63,9 +63,9 @@ class BaseCalculator(object):
             The Element node is returned after processing.
         '''
 
-        for tag in operation_tag, insert_tag, value_tag, key_tag:
-            if element.get(tag):
-                del element.attrib[tag]
+        for ele in element.iter():
+            for attribute in ele.attrib.keys():
+                del ele.attrib[attribute]
         return element
 
     @staticmethod

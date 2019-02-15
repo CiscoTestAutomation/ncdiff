@@ -664,7 +664,9 @@ class ModelDevice(manager.Manager):
                 if ret.group(1) in possible_part1():
                     return (ret.group(1), ret.group(2))
                 else:
-                    return ('', tag)
+                    raise ValueError("namespace '{}' in tag '{}' cannot be " \
+                                     "found in namespaces of any models" \
+                                     .format(ret.group(1), tag))
             else:
                 return ('', tag)
 

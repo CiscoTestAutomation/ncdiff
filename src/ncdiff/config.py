@@ -127,10 +127,7 @@ class Config(object):
 
     def __sub__(self, other):
         if type(other) == Config:
-            if self == other:
-                return None
-            else:
-                return ConfigDelta(config_src=other, config_dst=self)
+            return ConfigDelta(config_src=other, config_dst=self)
         elif isinstance(other, ConfigDelta):
             return self.__add__(-other)
         else:
@@ -195,7 +192,8 @@ class Config(object):
             else:
                 ret = re.search('^{(.+)}(.+)$', child.tag)
                 if not ret:
-                    raise ConfigError("unknown root '{}'", child.tag)
+                    raise ConfigError("unknown root including URL '{}'" \
+                                      .format(child.tag))
                 url_to_name = {i[2]: i[0] for i in self.device.namespaces
                                if i[1] is not None}
                 if ret.group(1) in url_to_name:
@@ -205,7 +203,8 @@ class Config(object):
                                        .format(url_to_name[ret.group(1)],
                                                self.device))
                 else:
-                    raise ConfigError("unknown model url '{}'", ret.group(1))
+                    raise ConfigError("unknown model URL '{}'" \
+                                      .format(ret.group(1)))
         return roots
 
     def get_schema_node(self, node):
@@ -270,6 +269,13 @@ class Config(object):
         self.roots
         for child in self.ele.getchildren():
             self._validate_node(child)
+
+            # clean up empty NP containers
+            child_schema_node = self.device.get_schema_node(child)
+            if len(child) == 0 and \
+               child_schema_node.get('type') == 'container' and \
+               child_schema_node.get('presence') != 'true':
+                self.ele.remove(child)
 
     def ns_help(self):
         '''ns_help
@@ -522,7 +528,7 @@ class ConfigDelta(object):
                             .format(type(config_dst)))
         self.config_dst = config_dst
         if self.config_dst is None and delta is None:
-            raise ValueError("either 'config_dst' or 'delta' must present")
+            self.config_dst = self.config_src
         if delta is not None:
             if self.config_dst is not None:
                 logger.warning("argument 'config_dst' is ignored as 'delta' " \
