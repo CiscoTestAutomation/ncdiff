@@ -1,6 +1,7 @@
 import logging
 from ncclient import xml_
 
+from .ref import IdentityRef, InstanceIdentifier
 from .errors import ConfigError
 
 # create a logger for this module
@@ -214,7 +215,7 @@ class BaseCalculator(object):
         s_node = self.device.get_schema_node(child_self)
         if s_node.get('type') == 'leaf-list':
             return list(filter(lambda x:
-                               child_self.text == x.text,
+                               self._same_text(child_self, x),
                                peers))
         elif s_node.get('type') == 'list':
             keys = self._get_list_keys(s_node)
@@ -260,9 +261,107 @@ class BaseCalculator(object):
                 raise ConfigError("not unique key '{}' in node {}" \
                                   .format(key,
                                           self.device.get_xpath(node_self)))
-            if s[0].text != o[0].text:
+            if not self._same_text(s[0], o[0]):
                 return False
         return True
+
+    def _parse_text(self, node):
+        '''_parse_text
+
+        Low-level api: Return text if a node. Pharsing is required if the node
+        data type is identityref or instance-identifier.
+
+        Parameters
+        ----------
+
+        node : `Element`
+            An Element node in data tree.
+
+        Returns
+        -------
+
+        None or str
+            None if the node does not have text, otherwise, text string of the
+            node.
+        '''
+
+        if node.text is None:
+            return None
+        schema_node = self.device.get_schema_node(node)
+        if schema_node.get('datatype') is not None and \
+           schema_node.get('datatype')[:11] == 'identityref':
+            idref = IdentityRef(self.device, node)
+            return idref.default
+        elif schema_node.get('datatype') is not None and \
+             schema_node.get('datatype') == 'instance-identifier':
+            instanceid = InstanceIdentifier(self.device, node)
+            return instanceid.default
+        else:
+            return node.text
+
+    def _same_text(self, node1, node2):
+        '''_same_text
+
+        Low-level api: Compare text values of two nodes.
+
+        Parameters
+        ----------
+
+        node1 : `Element`
+            An Element node in data tree.
+
+        node2 : `Element`
+            An Element node in data tree.
+
+        Returns
+        -------
+
+        bool
+            True if text values of two nodes are same, otherwise, False.
+        '''
+
+        if node1.text is None and node2.text is None:
+            return True
+        return self._parse_text(node1) == self._parse_text(node2)
+
+    def _merge_text(self, from_node, to_node):
+        '''_merge_text
+
+        Low-level api: Set text value of to_node according to the text value of
+        from_node.
+
+        Parameters
+        ----------
+
+        from_node : `Element`
+            An Element node in data tree.
+
+        to_node : `Element`
+            An Element node in data tree.
+
+        Returns
+        -------
+
+        None
+            There is no return of this method.
+        '''
+
+        if from_node.text is None:
+            to_node.text = None
+            return
+        schema_node = self.device.get_schema_node(from_node)
+        if schema_node.get('datatype') is not None and \
+           schema_node.get('datatype')[:11] == 'identityref':
+            idref = IdentityRef(self.device,
+                                from_node, to_node=to_node)
+            to_node.text = idref.converted
+        elif schema_node.get('datatype') is not None and \
+             schema_node.get('datatype') == 'instance-identifier':
+            instanceid = InstanceIdentifier(self.device,
+                                            from_node, to_node=to_node)
+            to_node.text = instanceid.converted
+        else:
+            to_node.text = from_node.text
 
     @property
     def le(self):
@@ -315,9 +414,11 @@ class BaseCalculator(object):
             False.
         '''
 
-        for x in ['tag', 'text', 'tail']:
+        for x in ['tag', 'tail']:
             if node_self.__getattribute__(x) != node_other.__getattribute__(x):
                 return False
+        if not self._same_text(node_self, node_other):
+            return False
         for a in node_self.attrib:
             if a not in node_other.attrib or \
                node_self.attrib[a] != node_other.attrib[a]:

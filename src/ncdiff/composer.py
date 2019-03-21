@@ -25,7 +25,7 @@ class Tag(object):
     STR = {}
     STR[NAME] = 'module name'
     STR[PREFIX] = 'module prefix'
-    STR[NAMESPACE] = 'module namespace'
+    STR[NAMESPACE] = 'module URL'
 
     NO_OMIT = 10
     OMIT_BY_INHERITANCE = 11

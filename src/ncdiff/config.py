@@ -72,12 +72,8 @@ class Config(object):
              etree.iselement(config):
             self.parser = NetconfParser(self.device, config)
             self.ele = self.parser.ele
-        elif isinstance(config, Response):
-            self.parser = RestconfParser(self.device, config)
-            self.ele = self.parser.ele
-        elif isinstance(config, GetResponse):
-            self.parser = gNMIParser(self.device, config)
-            self.ele = self.parser.ele
+        elif isinstance(config, Config):
+            self.ele = config.ele
         else:
             raise TypeError("argument 'config' must be None, XML string, " \
                             "or Element, but not '{}'" \

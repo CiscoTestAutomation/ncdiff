@@ -32,6 +32,19 @@ def _inserterror(direction, path, attr_name, attr_value=None):
                                "attribute '{}'" \
                                .format(path, direction, attr_name))
 
+def _copy_element(new_parent, element):
+    new_child = etree.SubElement(new_parent, element.tag,
+                                 attrib=element.attrib,
+                                 nsmap=element.nsmap)
+    if element.text is not None:
+        new_child.text = element.text
+    for subelement in element:
+        _copy_element(new_child, subelement)
+
+def _copy_elements(new_parent, elements):
+    for element in elements:
+        _copy_element(new_parent, element)
+
 
 class NetconfParser(object):
     '''NetconfParser
@@ -84,16 +97,16 @@ class NetconfParser(object):
             raise TypeError("argument 'element' must be Element not '{}'" \
                             .format(type(element)))
         ret = etree.Element(config_tag, nsmap={'nc': nc_url})
-        ret.extend(deepcopy(element.xpath('/nc:rpc-reply/nc:data/*',
-                            namespaces={'nc': nc_url})))
-        ret.extend(deepcopy(element.xpath('/nc:data/*',
-                            namespaces={'nc': nc_url})))
-        ret.extend(deepcopy(element.xpath('/nc:config/*',
-                            namespaces={'nc': nc_url})))
-        ret.extend(deepcopy(element.xpath('/nc:rpc/nc:edit-config/nc:config/*',
-                            namespaces={'nc': nc_url})))
-        ret.extend(deepcopy(element.xpath('/nc:edit-config/nc:config/*',
-                            namespaces={'nc': nc_url})))
+        _copy_elements(ret, element.xpath('/nc:rpc-reply/nc:data/*',
+                            namespaces={'nc': nc_url}))
+        _copy_elements(ret, element.xpath('/nc:data/*',
+                            namespaces={'nc': nc_url}))
+        _copy_elements(ret, element.xpath('/nc:config/*',
+                            namespaces={'nc': nc_url}))
+        _copy_elements(ret, element.xpath('/nc:rpc/nc:edit-config/nc:config/*',
+                            namespaces={'nc': nc_url}))
+        _copy_elements(ret, element.xpath('/nc:edit-config/nc:config/*',
+                            namespaces={'nc': nc_url}))
         return ret
 
 
@@ -478,9 +491,9 @@ class NetconfCalculator(BaseCalculator):
 
         this_operation = child_other.get(operation_tag, default='merge')
         if this_operation == 'merge':
-            child_self.text = child_other.text
+            self._merge_text(child_other, child_self)
         elif this_operation == 'replace':
-            child_self.text = child_other.text
+            self._merge_text(child_other, child_self)
         elif this_operation == 'create':
             raise ConfigDeltaError('data-exists: try to create node {} but ' \
                                    'it already exists' \
@@ -741,13 +754,14 @@ class NetconfCalculator(BaseCalculator):
             list_other = [c for c in list(node_other) if c.tag == tag]
             s_node = self.device.get_schema_node((list_self + list_other)[0])
             if s_node.get('ordered-by') == 'user':
-                if [i.text for i in list_self] == [i.text for i in list_other]:
+                if [self._parse_text(i) for i in list_self] == \
+                   [self._parse_text(i) for i in list_other]:
                     return True
                 else:
                     return False
             else:
-                if set([i.text for i in list_self]) == \
-                   set([i.text for i in list_other]):
+                if set([self._parse_text(i) for i in list_self]) == \
+                   set([self._parse_text(i) for i in list_other]):
                     return True
                 else:
                     return False
@@ -785,7 +799,7 @@ class NetconfCalculator(BaseCalculator):
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
                     ordered_by_user[s_node.tag] = 'leaf-list'
-                child_other.text = child_self.text
+                self._merge_text(child_self, child_other)
             elif s_node.get('type') == 'list':
                 keys = self._get_list_keys(s_node)
                 if s_node.get('ordered-by') == 'user' and \
@@ -811,7 +825,7 @@ class NetconfCalculator(BaseCalculator):
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
                     ordered_by_user[s_node.tag] = 'leaf-list'
-                child_self.text = child_other.text
+                self._merge_text(child_other, child_self)
             elif s_node.get('type') == 'list':
                 keys = self._get_list_keys(s_node)
                 if s_node.get('ordered-by') == 'user' and \
@@ -824,7 +838,7 @@ class NetconfCalculator(BaseCalculator):
         for child_self, child_other in in_s_and_in_o:
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') == 'leaf':
-                if child_self.text == child_other.text:
+                if self._same_text(child_self, child_other):
                     if not s_node.get('is_key'):
                         node_self.remove(child_self)
                         node_other.remove(child_other)
