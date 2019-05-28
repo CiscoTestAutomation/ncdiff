@@ -192,25 +192,48 @@ class InstanceIdentifier(IdentityRef):
                     return
                 position += len(piece[0])
 
+    @staticmethod
+    def convert_literal(literal):
+        quote = '"'
+        converted_literal = literal[1:-1]
+        converted_literal = re.sub("'", "''", converted_literal)
+        return "'" + re.sub('""', '"', converted_literal) + "'"
+
     def parse_quote(self):
         string = self.string(1)
         start_idx = None
+        start_escape = None
         for idx, char in enumerate(string):
             if start_idx is None and char == '=':
                 start_idx = idx + 1
             elif start_idx is not None and idx == start_idx:
-                if char != "'":
-                    raise ConfigError("do not see a single quote after '=' " \
-                                      "in node {}" \
+                if char != "'" and char != '"':
+                    raise ConfigError("do not see a apostrophe or double " \
+                                      "quote after '=' in node {}" \
                                       .format(self.device.get_xpath(self.node)))
+                else:
+                    opening_quote = char
             elif start_idx is not None and idx > start_idx:
-                if char == "'":
+                if char == opening_quote:
+                    if idx < len(string)-1 and string[idx+1] == opening_quote:
+                        start_escape = idx
+                        continue
+                    end_escape = idx + 1
+                    if start_escape is not None and \
+                       (end_escape-start_escape)%2 == 0:
+                        start_escape = None
+                        continue
                     end_idx = idx + 1
-                    self.cut(start_idx, end_idx, string[start_idx:end_idx], 1)
+                    if opening_quote == '"':
+                        default_literal = \
+                            self.convert_literal(string[start_idx:end_idx])
+                    else:
+                        default_literal = string[start_idx:end_idx]
+                    self.cut(start_idx, end_idx, default_literal, 1)
                     start_idx = None
         if start_idx is not None:
-            raise ConfigError('found opening single quote, but not the ' \
-                              'closing quote in node {}' \
+            raise ConfigError('found opening apostrophe or double quote, but ' \
+                              'not the closing one in node {}' \
                               .format(self.device.get_xpath(self.node)))
 
     def parse_square_bracket(self, to_node=None):
