@@ -1,21 +1,19 @@
 [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/CiscoTestAutomation/ncdiff)
 
+# NETCONF Diff
 
-.. _ncdiff:
-
-
-Package ncdiff is a simplified version of yang.ncdiff. Both were initially
+Package ncdiff is a simplified version of `yang.ncdiff`. Both were initially
 developed internally in Cisco and is now available to the general public through
-open-source. yang.ncdiff is integrated into the modular architecture of pyATS
-framework, while ncdiff is more lightweight and standalone.
+open-source. `yang.ncdiff` is integrated into the modular architecture of pyATS
+framework, while `ncdiff` is more lightweight and standalone.
 
-Docs: `https://ncdiff.readthedocs.io/en/latest/ <https://ncdiff.readthedocs.io/en/latest/>`_
+Docs: https://ncdiff.readthedocs.io/en/latest/
 
-GitHub: `https://github.com/CiscoTestAutomation/ncdiff/ <https://github.com/CiscoTestAutomation/ncdiff/>`_
+GitHub: https://github.com/CiscoTestAutomation/ncdiff/
 
 
-Introduction
-============
+## Introduction
+
 
 Configuration is a major goal of NetConf. RFC 6241 claims "NETCONF defined in
 this document provides mechanisms to install, manipulate, and delete the
@@ -38,10 +36,10 @@ and ConfigDelta.
 * A config state of multiple models - Config
 * A config delta between two configs - ConfigDelta
 
-Quick examples can be found in section `Tutorial <https://ncdiff.readthedocs.io/en/latest/usage_tutorial.html>`_.
+Quick examples can be found in section [Tutorial](ttps://ncdiff.readthedocs.io/en/latest/usage_tutorial.html>).
 
-Features
---------
+# Features
+
 
 * Connect to a Netconf device by an instance of ModelDevice
 * Download, compile and print model schemas
@@ -54,11 +52,11 @@ Features
 * Present ConfigDelta objects in the form of Netconf (a config content of
   edit-config).
 
-Config Operations
------------------
+# Config Operations
 
 Summary of config operations:
 
+```text
 =============   =========   =============   =========   =============   ==============================
 operand         operator    operand         equality    result          note
 =============   =========   =============   =========   =============   ==============================
@@ -71,51 +69,39 @@ Config          \-          ConfigDelta     =           Config          Apply an
 ConfigDelta     \-          ConfigDelta     =           N/A             Not implemented
 ConfigDelta     \-          Config          =           N/A             Not implemented
 =============   =========   =============   =========   =============   ==============================
+```
 
 
-Usage Examples
-==============
+## Installation
 
-.. toctree::
-
-   usage_tutorial
-   usage_config
-   usage_configdelta
-   usage_model
-   usage_running
-   usage_rpcreply
-
-
-Installation
-============
 
 ncdiff module requires a few packages. Some of them are required implicitly:
 
-* `lxml <http://lxml.de/index.html>`_ (required by ncclient)
-* `paramiko <https://pypi.org/project/paramiko/>`_ (required by ncclient)
+* lxml http://lxml.de/index.html (required by ncclient)
+* paramiko https://pypi.org/project/paramiko/ (required by ncclient)
 
 Others are required directly:
 
-* `ncclient <http://ncclient.readthedocs.io/en/latest/>`_
-* `pyang <https://pypi.org/project/pyang/>`_
+* ncclient http://ncclient.readthedocs.io/en/latest/
+* pyang https://pypi.org/project/pyang/
 
 Installation of these packages are normally smooth. Based on our support
 experience, most issues are related to lxml and paramiko installation.
 
-ncdiff Installation
--------------------
+### ncdiff Installation
 
 This package can be installed from pypi server.
 
 First-time installation steps:
 
-.. code-block:: text
-
+```bash
     pip install ncdiff
-
+```
 
 Steps to upgrade to latest:
 
-.. code-block:: text
+```bash
 
     pip install --upgrade ncdiff
+
+```
