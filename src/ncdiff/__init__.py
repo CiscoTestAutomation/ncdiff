@@ -136,7 +136,6 @@ def request(self, config, format='xml', target='candidate', default_operation=No
     if format == 'xml':
         # node.append(validated_element(config, ("config", qualify("config"))))
         _append(node, validated_element(config, ("config", qualify("config"))))
-        print(etree.tostring(node, encoding='unicode', pretty_print=True))
     if format == 'text':
         config_text = sub_ele(node, "config-text")
         sub_ele(config_text, "configuration-text").text = config

@@ -194,7 +194,6 @@ class InstanceIdentifier(IdentityRef):
 
     @staticmethod
     def convert_literal(literal):
-        quote = '"'
         converted_literal = literal[1:-1]
         converted_literal = re.sub("'", "''", converted_literal)
         return "'" + re.sub('""', '"', converted_literal) + "'"
