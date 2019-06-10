@@ -9,7 +9,7 @@ from ncclient.devices.default import DefaultDeviceHandler
 
 from .model import Model, ModelDownloader, ModelCompiler
 from .config import Config
-from .errors import ModelError, ModelMissing
+from .errors import ModelError, ModelMissing, ConfigError
 from .composer import Tag, Composer
 
 # create a logger for this module
@@ -94,8 +94,13 @@ class ModelDevice(manager.Manager):
         '''
 
         manager.Manager.__init__(self, session = session,
-                                       device_handler = device_handler,
-                                       **kwargs)
+                                       device_handler = device_handler)
+
+        supported_args = ['timeout', 'async_mode' , 'raise_mode']
+        for arg in supported_args:
+            if arg in kwargs:
+                setattr(self, kwarg, kwargs[arg])
+
         self.models = {}
         self.nodes = {}
         self.compiler = None
@@ -452,13 +457,16 @@ class ModelDevice(manager.Manager):
         -------
 
         Element
-            A schema node, or None when nothing can be found.
+            A schema node.
 
         Raises
         ------
 
         ModelError
             If identifier is not unique in a namespace.
+
+        ConfigError
+            when nothing can be found.
 
 
         Code Example::
@@ -515,18 +523,22 @@ class ModelDevice(manager.Manager):
             return self.nodes[' '.join(config_path)]
         if len(config_path) > 1:
             parent = self.get_schema_node(config_node.getparent())
-            if parent is None:
-                return None
-            else:
-                child = get_child(parent, config_node.tag)
-                if child is not None:
-                    self.nodes[' '.join(config_path)] = child
-                return child
+            child = get_child(parent, config_node.tag)
+            if child is None:
+                raise ConfigError("unable to locate a child '{}' of {} in " \
+                                  "schema tree" \
+                                  .format(config_node.tag,
+                                          self.get_xpath(parent)))
+            self.nodes[' '.join(config_path)] = child
+            return child
         else:
             tree = self.models[n.model_name].tree
             child = get_child(tree, config_node.tag)
-            if child is not None:
-                self.nodes[' '.join(config_path)] = child
+            if child is None:
+                raise ConfigError("unable to locate a root '{}' in {} schema " \
+                                  "tree" \
+                                  .format(config_node.tag, n.model_name))
+            self.nodes[' '.join(config_path)] = child
             return child
 
     def get_model_name(self, node):
