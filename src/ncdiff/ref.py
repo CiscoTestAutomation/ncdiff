@@ -33,6 +33,8 @@ class IdentityRef(object):
         self.device = device
         self.node = node
         self.to_node = to_node
+        self.node_url = self.device.convert_tag('', self.node.tag)[0]
+        self._default_ns = {}
 
     @property
     def converted(self):
@@ -48,16 +50,26 @@ class IdentityRef(object):
                               .format(self.device.get_xpath(self.node)))
         return self.convert(self.node.text, to_node=None)
 
+    @property
+    def default_ns(self):
+        self._default_ns = {None: self.node_url}
+        self.default
+        return self._default_ns
+
     def parse_prefixed_id(self, id, node):
         match = re.search(Tag.COLON[0], id)
         if match:
             if match.group(1) in node.nsmap:
                 return node.nsmap[match.group(1)], match.group(2)
+            elif match.group(1) in [ns[0] for ns in self.device.namespaces]:
+                name_to_url = {ns[0]: ns[2] for ns in self.device.namespaces}
+                return name_to_url[match.group(1)], match.group(2)
             else:
                 raise ConfigError("unknown prefix '{}' in node {}" \
                                   .format(match.group(1),
                                           self.device.get_xpath(node)))
         else:
+            # RFC7950 section 9.10.3 and RFC7951 section 6.8
             if None in node.nsmap:
                 return node.nsmap[None], id
             else:
@@ -66,14 +78,22 @@ class IdentityRef(object):
                                   .format(self.device.get_xpath(node)))
 
     def compose_prefixed_id(self, url, id, to_node=None):
-        def url_to_name(url):
-            return self.device.convert_ns(url,
-                                          src=Tag.NAMESPACE,
-                                          dst=Tag.NAME)
+        def url_to_name(url, ns):
+            model_name = self.device.convert_ns(url,
+                                                src=Tag.NAMESPACE,
+                                                dst=Tag.NAME)
+            if url not in ns.values():
+                ns[model_name] = url
+            return model_name
 
         if to_node is None:
-            return '{}:{}'.format(url_to_name(url), id)
+            # RFC7951 section 6.8
+            if url == self.node_url:
+                return id
+            else:
+                return '{}:{}'.format(url_to_name(url, self._default_ns), id)
         else:
+            # RFC7950 section 9.10.3
             url_to_prefix = {v: k for k, v in to_node.nsmap.items()}
             if url in url_to_prefix:
                 if url_to_prefix[url] is None:
@@ -149,6 +169,7 @@ class InstanceIdentifier(IdentityRef):
         self.parse_quote()
         self.parse_square_bracket(to_node=self.to_node)
         self.parse_element(to_node=self.to_node)
+        self.convert_str_list(to_node=self.to_node)
         return ''.join([p[2] for p in self.str_list])
 
     @property
@@ -157,11 +178,94 @@ class InstanceIdentifier(IdentityRef):
         self.parse_quote()
         self.parse_square_bracket()
         self.parse_element()
+        self.convert_str_list()
         return ''.join([p[2] for p in self.str_list])
 
     def string(self, phase_num):
         return ''.join([p[0] for p in self.str_list
                         if p[1] == 0 or p[1] >= phase_num])
+
+    def parse_prefixed_id(self, id, node):
+        match = re.search(Tag.COLON[0], id)
+        if match:
+            if match.group(1) in node.nsmap:
+                return node.nsmap[match.group(1)], match.group(2)
+            elif match.group(1) in [ns[0] for ns in self.device.namespaces]:
+                name_to_url = {ns[0]: ns[2] for ns in self.device.namespaces}
+                return name_to_url[match.group(1)], match.group(2)
+            else:
+                raise ConfigError("unknown prefix '{}' in node {}" \
+                                  .format(match.group(1),
+                                          self.device.get_xpath(node)))
+        else:
+            # RFC7950 section 9.13.2 and RFC7951 section 6.11
+            return None, id
+
+    def compose_prefixed_id(self, url, id, to_node=None):
+        def url_to_name(url, ns):
+            model_name = self.device.convert_ns(url,
+                                                src=Tag.NAMESPACE,
+                                                dst=Tag.NAME)
+            if url not in ns.values():
+                ns[model_name] = url
+            return model_name
+
+        # RFC7950 section 9.13.2
+        if to_node is None:
+            return '{}:{}'.format(url_to_name(url, self._default_ns), id)
+        else:
+            url_to_prefix = {v: k for k, v in to_node.nsmap.items()
+                                  if k is not None}
+            if url in url_to_prefix:
+                return '{}:{}'.format(url_to_prefix[url], id)
+            else:
+                raise ConfigError("URL '{}' is not found in to_node.nsmap {} " \
+                                  "(default namespace cannot be used here), " \
+                                  "where to_node is {}" \
+                                  .format(url, to_node.nsmap,
+                                          self.device.get_xpath(to_node)))
+
+    def convert_str_list(self, to_node=None):
+        default_url = None
+        new_str_list = []
+        for piece in self.str_list:
+            if piece[1] <= 1:
+                new_str_list.append(piece)
+            elif piece[1] == 2:
+                if piece[0] == '[' or \
+                   piece[0] == ']' or \
+                   piece[0] == '=' or \
+                   piece[0] == '.':
+                    new_str_list.append((piece[0], piece[1], piece[0]))
+                else:
+                    url, id = self.parse_prefixed_id(piece[0], self.node)
+                    if url is None:
+                        url = default_url
+                    if url is None:
+                        p = self.device.get_xpath(self.node)
+                        raise ConfigError("in instance-identifier node {}, " \
+                                          "the leftmost data node name '{}' " \
+                                          "is not in namespace-qualified form" \
+                                          .format(p, piece[0]))
+                    else:
+                        converted_id = self.compose_prefixed_id(url, id,
+                                                                to_node=to_node)
+                        new_str_list.append((piece[0], piece[1], converted_id))
+            elif piece[1] == 3:
+                url, id = self.parse_prefixed_id(piece[0], self.node)
+                if url is not None:
+                    default_url = url
+                if default_url is None:
+                    raise ConfigError("in instance-identifier node {}, the " \
+                                      "leftmost data node name '{}' is not " \
+                                      "in namespace-qualified form" \
+                                      .format(self.device.get_xpath(self.node),
+                                              piece[0]))
+                else:
+                    converted_id = self.compose_prefixed_id(default_url, id,
+                                                            to_node=to_node)
+                    new_str_list.append((piece[0], piece[1], converted_id))
+        self.str_list = new_str_list
 
     def cut(self, start_idx, end_idx, converted_str, phase_num):
         def this_piece(idx, start_idx, end_idx, converted_str, phase_num):
@@ -253,8 +357,7 @@ class InstanceIdentifier(IdentityRef):
                         if tag == '.':
                             self.cut(start_idx+1, end_idx-2, '.', 2)
                         else:
-                            self.cut(start_idx+1, end_idx-2,
-                                     self.convert(tag, to_node=to_node), 2)
+                            self.cut(start_idx+1, end_idx-2, tag, 2)
                         start_idx = None
                     else:
                         if re.search('^\[[1-9][0-9]*\]$', substring):
@@ -262,8 +365,7 @@ class InstanceIdentifier(IdentityRef):
                             self.cut(start_idx+1, end_idx-1, numbers, 2)
                         else:
                             tag = substring[1:-1]
-                            self.cut(start_idx+1, end_idx-1,
-                                     self.convert(tag, to_node=to_node), 2)
+                            self.cut(start_idx+1, end_idx-1, tag, 2)
                         start_idx = None
         if start_idx is not None:
             raise ConfigError('found opening square bracket, but not the ' \
@@ -283,8 +385,7 @@ class InstanceIdentifier(IdentityRef):
                 if tag == '*':
                     self.cut(start_idx, end_idx, '*', 3)
                 else:
-                    self.cut(start_idx, end_idx,
-                             self.convert(tag, to_node=to_node), 3)
+                    self.cut(start_idx, end_idx, tag, 3)
                 start_idx = None
         if start_idx is not None:
             end_idx = idx + 1
@@ -292,5 +393,4 @@ class InstanceIdentifier(IdentityRef):
             if tag == '*':
                 self.cut(start_idx, end_idx, '*', 3)
             else:
-                self.cut(start_idx, end_idx,
-                         self.convert(tag, to_node=to_node), 3)
+                self.cut(start_idx, end_idx, tag, 3)

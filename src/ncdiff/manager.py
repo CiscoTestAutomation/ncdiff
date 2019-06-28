@@ -716,14 +716,14 @@ class ModelDevice(manager.Manager):
             return tag_ns, format_tag(convert(tag_ns), tag_name)
         elif dst[1] == Tag.OMIT_BY_INHERITANCE:
             if default_ns == tag_ns:
-                return default_ns, format_tag('', tag_name)
+                return tag_ns, format_tag('', tag_name)
             else:
                 return tag_ns, format_tag(convert(tag_ns), tag_name)
         elif dst[1] == Tag.OMIT_BY_MODULE:
             if default_ns == tag_ns:
-                return default_ns, format_tag('', tag_name)
+                return tag_ns, format_tag('', tag_name)
             else:
-                return default_ns, format_tag(convert(tag_ns), tag_name)
+                return tag_ns, format_tag(convert(tag_ns), tag_name)
         else:
             raise ValueError("unknown value '{}' in class Tag".format(dst[1]))
 
