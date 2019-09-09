@@ -39,15 +39,17 @@ class IdentityRef(object):
     @property
     def converted(self):
         if self.node.text is None:
-            raise ConfigError("node {} is an identityref but no value" \
-                              .format(self.device.get_xpath(self.node)))
+            raise ConfigError("the node with tag {} is an identityref but no " \
+                              "value" \
+                              .format(self.node.tag))
         return self.convert(self.node.text, to_node=self.to_node)
 
     @property
     def default(self):
         if self.node.text is None:
-            raise ConfigError("node {} is an identityref but no value" \
-                              .format(self.device.get_xpath(self.node)))
+            raise ConfigError("the node with tag {} is an identityref but no " \
+                              "value" \
+                              .format(self.node.tag))
         return self.convert(self.node.text, to_node=None)
 
     @property
@@ -65,17 +67,17 @@ class IdentityRef(object):
                 name_to_url = {ns[0]: ns[2] for ns in self.device.namespaces}
                 return name_to_url[match.group(1)], match.group(2)
             else:
-                raise ConfigError("unknown prefix '{}' in node {}" \
-                                  .format(match.group(1),
-                                          self.device.get_xpath(node)))
+                raise ConfigError("unknown prefix '{}' in the node with tag " \
+                                  "{}" \
+                                  .format(match.group(1), node.tag))
         else:
             # RFC7950 section 9.10.3 and RFC7951 section 6.8
             if None in node.nsmap:
                 return node.nsmap[None], id
             else:
                 raise ConfigError("fail to find default namespace of " \
-                                  "node {}" \
-                                  .format(self.device.get_xpath(node)))
+                                  "the node with tag {}" \
+                                  .format(node.tag))
 
     def compose_prefixed_id(self, url, id, to_node=None):
         def url_to_name(url, ns):
@@ -102,9 +104,8 @@ class IdentityRef(object):
                     return '{}:{}'.format(url_to_prefix[url], id)
             else:
                 raise ConfigError("URL '{}' is not found in to_node.nsmap " \
-                                  "{}, where to_node is {}" \
-                                  .format(url, to_node.nsmap,
-                                          self.device.get_xpath(to_node)))
+                                  "{}, where the to_node has tag {}" \
+                                  .format(url, to_node.nsmap, to_node.tag))
 
     def convert(self, tag, to_node=None):
         url, id = self.parse_prefixed_id(tag, self.node)
@@ -112,8 +113,9 @@ class IdentityRef(object):
 
     def parse_instanceid(self, node, to_node=None):
         if node.text is None:
-            raise ConfigError("node {} is an instance-identifier but no value" \
-                              .format(self.device.get_xpath(node)))
+            raise ConfigError("the node with tag {} is an " \
+                              "instance-identifier but no value" \
+                              .format(node.tag))
         tag = ''
         new_instanceid = ''
         expecting = '*./'
@@ -194,9 +196,9 @@ class InstanceIdentifier(IdentityRef):
                 name_to_url = {ns[0]: ns[2] for ns in self.device.namespaces}
                 return name_to_url[match.group(1)], match.group(2)
             else:
-                raise ConfigError("unknown prefix '{}' in node {}" \
-                                  .format(match.group(1),
-                                          self.device.get_xpath(node)))
+                raise ConfigError("unknown prefix '{}' in the node with tag " \
+                                  "{}" \
+                                  .format(match.group(1), node.tag))
         else:
             # RFC7950 section 9.13.2 and RFC7951 section 6.11
             return None, id
@@ -221,9 +223,8 @@ class InstanceIdentifier(IdentityRef):
             else:
                 raise ConfigError("URL '{}' is not found in to_node.nsmap {} " \
                                   "(default namespace cannot be used here), " \
-                                  "where to_node is {}" \
-                                  .format(url, to_node.nsmap,
-                                          self.device.get_xpath(to_node)))
+                                  "where the to_node has tag {}" \
+                                  .format(url, to_node.nsmap, to_node.tag))
 
     def convert_str_list(self, to_node=None):
         default_url = None
@@ -242,11 +243,11 @@ class InstanceIdentifier(IdentityRef):
                     if url is None:
                         url = default_url
                     if url is None:
-                        p = self.device.get_xpath(self.node)
-                        raise ConfigError("in instance-identifier node {}, " \
-                                          "the leftmost data node name '{}' " \
-                                          "is not in namespace-qualified form" \
-                                          .format(p, piece[0]))
+                        raise ConfigError("in the instance-identifier node " \
+                                          "with tag {}, the leftmost data " \
+                                          "node name '{}' is not in " \
+                                          "namespace-qualified form" \
+                                          .format(self.node.tag, piece[0]))
                     else:
                         converted_id = self.compose_prefixed_id(url, id,
                                                                 to_node=to_node)
@@ -256,11 +257,11 @@ class InstanceIdentifier(IdentityRef):
                 if url is not None:
                     default_url = url
                 if default_url is None:
-                    raise ConfigError("in instance-identifier node {}, the " \
-                                      "leftmost data node name '{}' is not " \
-                                      "in namespace-qualified form" \
-                                      .format(self.device.get_xpath(self.node),
-                                              piece[0]))
+                    raise ConfigError("in the instance-identifier node " \
+                                      "with tag {}, the leftmost data " \
+                                      "node name '{}' is not in " \
+                                      "namespace-qualified form" \
+                                      .format(self.node.tag, piece[0]))
                 else:
                     converted_id = self.compose_prefixed_id(default_url, id,
                                                             to_node=to_node)
@@ -312,8 +313,9 @@ class InstanceIdentifier(IdentityRef):
             elif start_idx is not None and idx == start_idx:
                 if char != "'" and char != '"':
                     raise ConfigError("do not see a apostrophe or double " \
-                                      "quote after '=' in node {}" \
-                                      .format(self.device.get_xpath(self.node)))
+                                      "quote after '=' in the node with tag " \
+                                      "{}" \
+                                      .format(self.node.tag))
                 else:
                     opening_quote = char
             elif start_idx is not None and idx > start_idx:
@@ -336,8 +338,8 @@ class InstanceIdentifier(IdentityRef):
                     start_idx = None
         if start_idx is not None:
             raise ConfigError('found opening apostrophe or double quote, but ' \
-                              'not the closing one in node {}' \
-                              .format(self.device.get_xpath(self.node)))
+                              'not the closing one in the node with tag {}' \
+                              .format(self.node.tag))
 
     def parse_square_bracket(self, to_node=None):
         string = self.string(2)
@@ -369,8 +371,8 @@ class InstanceIdentifier(IdentityRef):
                         start_idx = None
         if start_idx is not None:
             raise ConfigError('found opening square bracket, but not the ' \
-                              'closing bracket in node {}' \
-                              .format(self.device.get_xpath(self.node)))
+                              'closing bracket in the node with tag {}' \
+                              .format(self.node))
 
     def parse_element(self, to_node=None):
         SEPARATORS = "./"
