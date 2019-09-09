@@ -518,10 +518,10 @@ class ModelDevice(manager.Manager):
             return True
 
         n = Composer(self, config_node)
-        config_path = n.path
-        if ' '.join(config_path) in self.nodes:
-            return self.nodes[' '.join(config_path)]
-        if len(config_path) > 1:
+        config_path_str = ' '.join(n.path)
+        if config_path_str in self.nodes:
+            return self.nodes[config_path_str]
+        if len(n.path) > 1:
             parent = self.get_schema_node(config_node.getparent())
             child = get_child(parent, config_node.tag)
             if child is None:
@@ -529,7 +529,7 @@ class ModelDevice(manager.Manager):
                                   "schema tree" \
                                   .format(config_node.tag,
                                           self.get_xpath(parent)))
-            self.nodes[' '.join(config_path)] = child
+            self.nodes[config_path_str] = child
             return child
         else:
             tree = self.models[n.model_name].tree
@@ -538,7 +538,7 @@ class ModelDevice(manager.Manager):
                 raise ConfigError("unable to locate a root '{}' in {} schema " \
                                   "tree" \
                                   .format(config_node.tag, n.model_name))
-            self.nodes[' '.join(config_path)] = child
+            self.nodes[config_path_str] = child
             return child
 
     def get_model_name(self, node):
