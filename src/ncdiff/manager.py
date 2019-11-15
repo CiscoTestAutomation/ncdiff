@@ -104,6 +104,7 @@ class ModelDevice(manager.Manager):
         self.models = {}
         self.nodes = {}
         self.compiler = None
+        self._models_loadable = None
 
     def __repr__(self):
         return '<{}.{} object at {}>'.format(self.__class__.__module__,
@@ -125,13 +126,60 @@ class ModelDevice(manager.Manager):
 
     @property
     def models_loadable(self):
-        regexp_str = 'module=([a-zA-Z0-9-]+)\&{0,1}'
-        modules = []
-        for capability in iter(self.server_capabilities):
-            match = re.search(regexp_str, capability)
-            if match:
-                modules.append(match.group(1))
-        return sorted(modules)
+        if self._models_loadable is None:
+            NC_MONITORING = xml_.NETCONF_MONITORING_NS
+            YANG_LIB = 'urn:ietf:params:netconf:capability:yang-library'
+            YANG_LIB_1_0 = YANG_LIB + ':1.0'
+            NC_MONITORING_FILTER = """
+                <filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" type="subtree">
+                  <netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+                    <schemas/>
+                  </netconf-state>
+                </filter>
+                """
+            YANG_LIB_FILTER = """
+                <filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" type="subtree">
+                  <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+                    <module/>
+                  </modules-state>
+                </filter>
+                """
+            # RFC7895
+            if [c for c in self.server_capabilities
+                  if c[:len(NC_MONITORING)] == NC_MONITORING]:
+                reply = self.get(filter=NC_MONITORING_FILTER)
+                if not reply.ok:
+                    raise ModelError("Error when getting " \
+                                     "/netconf-state/schemas from YANG " \
+                                     "module 'ietf-netconf-monitoring':\n{}" \
+                                     .format(reply))
+                nsmap = {'ncm': NC_MONITORING}
+                p = '//ncm:netconf-state/ncm:schemas/ncm:schema/ncm:identifier'
+                self._models_loadable = \
+                    sorted([n.text for n in reply.xpath(p, namespaces=nsmap)])
+            # RFC7950 section 5.6.4
+            elif [c for c in self.server_capabilities
+                    if c[:len(YANG_LIB_1_0)] == YANG_LIB_1_0]:
+                reply = self.get(filter=YANG_LIB_FILTER)
+                if not reply.ok:
+                    raise ModelError("Error when getting " \
+                                     "/modules-state/module from YANG " \
+                                     "module 'ietf-yang-library':\n{}" \
+                                     .format(reply))
+                nsmap = {'yanglib': YANG_LIB}
+                p = '//yanglib:modules-state/yanglib:module/yanglib:name'
+                self._models_loadable = \
+                    sorted([n.text for n in reply.xpath(p, namespaces=nsmap)])
+            # RFC6020 section 5.6.4
+            else:
+                regexp_str = 'module=([a-zA-Z0-9-]+)\&{0,1}'
+                modules = []
+                for capability in iter(self.server_capabilities):
+                    match = re.search(regexp_str, capability)
+                    if match:
+                        modules.append(match.group(1))
+                self._models_loadable = sorted(modules)
+        return self._models_loadable
 
     @property
     def models_loaded(self):
