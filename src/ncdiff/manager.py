@@ -147,29 +147,33 @@ class ModelDevice(manager.Manager):
             # RFC7895
             if [c for c in self.server_capabilities
                   if c[:len(NC_MONITORING)] == NC_MONITORING]:
-                reply = self.get(filter=NC_MONITORING_FILTER)
+                reply = super().execute(operations.retrieve.Get,
+                                        filter=NC_MONITORING_FILTER)
                 if not reply.ok:
                     raise ModelError("Error when getting " \
                                      "/netconf-state/schemas from YANG " \
                                      "module 'ietf-netconf-monitoring':\n{}" \
                                      .format(reply))
-                nsmap = {'ncm': NC_MONITORING}
-                p = '//ncm:netconf-state/ncm:schemas/ncm:schema/ncm:identifier'
+                n = {'nc': nc_url, 'ncm': NC_MONITORING}
+                p = '/nc:rpc-reply/nc:data/ncm:netconf-state/ncm:schemas' \
+                    '/ncm:schema/ncm:identifier'
                 self._models_loadable = \
-                    sorted([n.text for n in reply.xpath(p, namespaces=nsmap)])
+                    sorted([n.text for n in reply.data.xpath(p, namespaces=n)])
             # RFC7950 section 5.6.4
             elif [c for c in self.server_capabilities
                     if c[:len(YANG_LIB_1_0)] == YANG_LIB_1_0]:
-                reply = self.get(filter=YANG_LIB_FILTER)
+                reply = super().execute(operations.retrieve.Get,
+                                        filter=YANG_LIB_FILTER)
                 if not reply.ok:
                     raise ModelError("Error when getting " \
                                      "/modules-state/module from YANG " \
                                      "module 'ietf-yang-library':\n{}" \
                                      .format(reply))
-                nsmap = {'yanglib': YANG_LIB}
-                p = '//yanglib:modules-state/yanglib:module/yanglib:name'
+                n = {'nc': nc_url, 'yanglib': YANG_LIB}
+                p = '/nc:rpc-reply/nc:data/yanglib:modules-state' \
+                    '/yanglib:module/yanglib:name'
                 self._models_loadable = \
-                    sorted([n.text for n in reply.xpath(p, namespaces=nsmap)])
+                    sorted([n.text for n in reply.data.xpath(p, namespaces=n)])
             # RFC6020 section 5.6.4
             else:
                 regexp_str = 'module=([a-zA-Z0-9-]+)\&{0,1}'
