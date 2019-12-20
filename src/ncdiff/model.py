@@ -60,7 +60,6 @@ class Model(object):
         self.url = self.prefixes[self.prefix]
         self.urls = {v: k for k, v in self.prefixes.items()}
         self.tree = self.convert_tree(tree)
-        self.raw_tree = tree
         self.roots = [c.tag for c in self.tree.getchildren()]
         self.width = {}
 
