@@ -60,6 +60,7 @@ class Model(object):
         self.url = self.prefixes[self.prefix]
         self.urls = {v: k for k, v in self.prefixes.items()}
         self.tree = self.convert_tree(tree)
+        self.raw_tree = tree
         self.roots = [c.tag for c in self.tree.getchildren()]
         self.width = {}
 
@@ -627,6 +628,20 @@ class ModelCompiler(object):
         self.pyang_errors = {}
         self.build_dependencies()
 
+    def _xml_from_cache(self, name):
+        cached_name = os.path.join(self.dir_yang, f"{name}.xml")
+        if os.path.exists(cached_name):
+            with(open(cached_name, "r", encoding="utf-8")) as fh:
+                parser = etree.XMLParser(remove_blank_text=True)
+                tree = etree.XML(fh.read(), parser)
+                return tree
+        return None
+
+    def _to_cache(self, name, value):
+        cached_name = os.path.join(self.dir_yang, f"{name}.xml")
+        with open(cached_name, "wb") as fh:
+            fh.write(value)
+
     def build_dependencies(self):
         '''build_dependencies
 
@@ -640,6 +655,11 @@ class ModelCompiler(object):
             Nothing returns.
         '''
 
+        from_cache = self._xml_from_cache("$dependencies")
+        if from_cache is not None:
+            self.dependencies = from_cache
+            return
+
         cmd_list = ['pyang', '--plugindir', self.pyang_plugins]
         cmd_list += ['-p', self.dir_yang]
         cmd_list += ['-f', 'pyimport']
@@ -651,6 +671,9 @@ class ModelCompiler(object):
         self.pyang_errors['all'] = stderr.replace(b'"\\\n"', b'"\\n"').decode()
         logger.warning(self.pyang_errors['all'])
         parser = etree.XMLParser(remove_blank_text=True)
+
+        self._to_cache("$dependencies",stdout)
+
         self.dependencies = etree.XML(stdout.decode(), parser)
 
     def get_dependencies(self, module):
@@ -703,6 +726,11 @@ class ModelCompiler(object):
         Model
             A Model object.
         '''
+        cached_tree = self._xml_from_cache(module)
+
+        if cached_tree is not None:
+            m = Model(cached_tree)
+            return m
 
         imports, depends = self.get_dependencies(module)
         file_list = list(imports | depends) + [module]
@@ -720,7 +748,11 @@ class ModelCompiler(object):
         else:
             logger.error(self.pyang_errors[module])
         parser = etree.XMLParser(remove_blank_text=True)
-        tree = etree.XML(stdout.decode(), parser)
+
+        self._to_cache(module, stdout)
+
+        out = stdout.decode()
+        tree = etree.XML(out, parser)
         return Model(tree)
 
 
