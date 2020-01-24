@@ -672,6 +672,8 @@ class ConfigCompatibility(object):
 
     @property
     def namespaces_compatible(self):
+        if self.config1.device == self.config2.device:
+            return True
 
         def check_models(models):
             for device in [self.config1.device, self.config2.device]:
