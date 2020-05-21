@@ -1,4 +1,6 @@
 import logging
+from functools import lru_cache
+
 from ncclient import xml_
 
 from .ref import IdentityRef, InstanceIdentifier
@@ -108,6 +110,70 @@ class BaseCalculator(object):
         return [child for child in parent.iterchildren(tag=tag)
                 if child in new_scope]
 
+    def _pair_childern(self, node_one, node_two):
+        # construct correctly keyed dict, for node_one:
+        # keys are (tag, self-key)
+        # self key is
+        #    text for leaf-list
+        #    key tuple for list
+        #    none for others
+
+        def find_one_child(node, tag):
+            s = list(node.iterchildren(tag=tag))
+            if len(s) < 1:
+                raise ConfigError("cannot find key '{}' in node {}" \
+                                  .format(tag,
+                                          self.device.get_xpath(node)))
+            if len(s) > 1:
+                raise ConfigError("not unique key '{}' in node {}" \
+                                  .format(tag,
+                                          self.device.get_xpath(node)))
+            return s[0]
+
+        def build_index_tuple(node, keys, s_node):
+            out = [self._parse_text(find_one_child(node, k), s_node) for k in keys]
+            return tuple(out)
+
+        type_for_tag = {}
+        def get_type_for_tag(tag, child):
+            node_type = type_for_tag.get(tag, None)
+            if node_type is not None:
+                return node_type
+            s_node = self.device.get_schema_node(child)
+            node_type = s_node.get('type')
+
+            result = (s_node, node_type)
+            type_for_tag[tag] = result
+            return result
+
+        def build_unique_id(child):
+            tag = child.tag
+            key = None
+            s_node, node_type = get_type_for_tag(tag, child)
+            if node_type == 'leaf-list':
+                key = self._parse_text(child, s_node)
+            elif node_type == 'list':
+                keys = self._get_list_keys(s_node)
+                key = build_index_tuple(child, keys, s_node)
+            return (tag, key)
+
+        ones = {}
+        for child in node_one.getchildren():
+            key = build_unique_id(child)
+            if key in ones:
+                raise Exception()
+            ones[key] = child
+
+        twos = {}
+        for child in node_two.getchildren():
+            key = build_unique_id(child)
+            if key in twos:
+                raise Exception()
+            twos[key] = child
+
+        return [(ones.get(uid, None), twos.get(uid, None)) for uid in set(ones.keys()).union(set(twos.keys()))]
+
+
     def _group_kids(self, node_one, node_two):
         '''_group_kids
 
@@ -140,30 +206,15 @@ class BaseCalculator(object):
         in_1_not_in_2 = []
         in_2_not_in_1 = []
         in_1_and_in_2 = []
-        for child in node_one.getchildren():
-            peers = self._get_peers(child, node_two)
-            if len(peers) < 1:
-                # child in self but not in other
-                in_1_not_in_2.append(child)
-            elif len(peers) > 1:
-                # one child in self matches multiple children in other
-                raise ConfigError('not unique peer of node {}' \
-                                  .format(self.device.get_xpath(child)))
+
+        for one, two in self._pair_childern(node_one, node_two):
+            if one is None:
+                in_2_not_in_1.append(two)
+            elif two is None:
+                in_1_not_in_2.append(one)
             else:
-                # child matches one peer in other
-                in_1_and_in_2.append((child, peers[0]))
-        for child in node_two.getchildren():
-            peers = self._get_peers(child, node_one)
-            if len(peers) < 1:
-                # child in other but not in self
-                in_2_not_in_1.append(child)
-            elif len(peers) > 1:
-                # one child in other matches multiple children in self
-                raise ConfigError('not unique peer of node {}' \
-                                  .format(self.device.get_xpath(child)))
-            else:
-                # child in self matches one peer in self
-                pass
+                in_1_and_in_2.append((one, two))
+
         return (in_1_not_in_2, in_2_not_in_1, in_1_and_in_2)
 
     @staticmethod
@@ -188,7 +239,7 @@ class BaseCalculator(object):
 
         nodes = list(filter(lambda x: x.get('is_key'),
                             schema_node.getchildren()))
-        return [n.tag for n in nodes]
+        return sorted([n.tag for n in nodes])
 
     def _get_peers(self, child_self, parent_other):
         '''_get_peers
@@ -265,7 +316,8 @@ class BaseCalculator(object):
                 return False
         return True
 
-    def _parse_text(self, node):
+    @lru_cache(maxsize=1024)
+    def _parse_text(self, node, schema_node=None):
         '''_parse_text
 
         Low-level api: Return text if a node. Pharsing is required if the node
@@ -287,7 +339,9 @@ class BaseCalculator(object):
 
         if node.text is None:
             return None
-        schema_node = self.device.get_schema_node(node)
+
+        if schema_node is None:
+            schema_node = self.device.get_schema_node(node)
         if schema_node.get('datatype') is not None and \
           (schema_node.get('datatype')[:11] == 'identityref' or schema_node.get('datatype')[:3] == '-> '):
             idref = IdentityRef(self.device, node)
@@ -423,38 +477,39 @@ class BaseCalculator(object):
             if a not in node_other.attrib or \
                node_self.attrib[a] != node_other.attrib[a]:
                 return False
-        for child in node_self.getchildren():
-            peers = self._get_peers(child, node_other)
-            if len(peers) < 1:
+        for child, child_other in self._pair_childern(node_self, node_other):
+            if child is None:
+                # only in other, meaningless
+                continue
+            if child_other is None:
+                # only in other, false
                 return False
-            elif len(peers) > 1:
-                raise ConfigError('not unique peer of node {}' \
-                                  .format(self.device.get_xpath(child)))
-            else:
-                schma_node = self.device.get_schema_node(child)
-                if schma_node.get('ordered-by') == 'user' and \
-                   schma_node.get('type') == 'leaf-list' or \
-                   schma_node.get('ordered-by') == 'user' and \
-                   schma_node.get('type') == 'list':
-                    elder_siblings = list(child.itersiblings(tag=child.tag,
-                                                             preceding=True))
-                    if elder_siblings:
-                        immediate_elder_sibling = elder_siblings[0]
-                        peers_of_immediate_elder_sibling = \
-                            self._get_peers(immediate_elder_sibling,
-                                            node_other)
-                        if len(peers_of_immediate_elder_sibling) < 1:
-                            return False
-                        elif len(peers_of_immediate_elder_sibling) > 1:
-                            p = self.device.get_xpath(immediate_elder_sibling)
-                            raise ConfigError('not unique peer of node {}' \
-                                              .format(p))
-                        elder_siblings_of_peer = \
-                            list(peers[0].itersiblings(tag=child.tag,
-                                                       preceding=True))
-                        if peers_of_immediate_elder_sibling[0] not in \
-                           elder_siblings_of_peer:
-                            return False
-                if not self._node_le(child, peers[0]):
-                    return False
+            # both are present
+            schma_node = self.device.get_schema_node(child)
+            if schma_node.get('ordered-by') == 'user' and \
+                    schma_node.get('type') == 'leaf-list' or \
+                    schma_node.get('ordered-by') == 'user' and \
+                    schma_node.get('type') == 'list':
+                elder_siblings = list(child.itersiblings(tag=child.tag,
+                                                         preceding=True))
+                if elder_siblings:
+                    immediate_elder_sibling = elder_siblings[0]
+                    peers_of_immediate_elder_sibling = \
+                        self._get_peers(immediate_elder_sibling,
+                                        node_other)
+                    if len(peers_of_immediate_elder_sibling) < 1:
+                        return False
+                    elif len(peers_of_immediate_elder_sibling) > 1:
+                        p = self.device.get_xpath(immediate_elder_sibling)
+                        raise ConfigError('not unique peer of node {}' \
+                                          .format(p))
+                    elder_siblings_of_peer = \
+                        list(child_other.itersiblings(tag=child.tag,
+                                                   preceding=True))
+                    if peers_of_immediate_elder_sibling[0] not in \
+                            elder_siblings_of_peer:
+                        return False
+            if not self._node_le(child, child_other):
+                return False
+
         return True

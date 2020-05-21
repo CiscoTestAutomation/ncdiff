@@ -754,14 +754,14 @@ class NetconfCalculator(BaseCalculator):
             list_other = [c for c in list(node_other) if c.tag == tag]
             s_node = self.device.get_schema_node((list_self + list_other)[0])
             if s_node.get('ordered-by') == 'user':
-                if [self._parse_text(i) for i in list_self] == \
-                   [self._parse_text(i) for i in list_other]:
+                if [self._parse_text(i, s_node) for i in list_self] == \
+                   [self._parse_text(i, s_node) for i in list_other]:
                     return True
                 else:
                     return False
             else:
-                if set([self._parse_text(i) for i in list_self]) == \
-                   set([self._parse_text(i) for i in list_other]):
+                if set([self._parse_text(i, s_node) for i in list_self]) == \
+                   set([self._parse_text(i, s_node) for i in list_other]):
                     return True
                 else:
                     return False
