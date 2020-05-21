@@ -1,5 +1,7 @@
 import os
 import re
+from functools import lru_cache
+
 import six
 import logging
 from lxml import etree
@@ -112,6 +114,7 @@ class ModelDevice(manager.Manager):
                                              hex(id(self)))
 
     @property
+    @lru_cache(maxsize=1)
     def namespaces(self):
         if self.compiler is None:
             raise ValueError('please first call scan_models() to build ' \

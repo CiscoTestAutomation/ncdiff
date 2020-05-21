@@ -78,7 +78,7 @@ class Config(object):
             raise TypeError("argument 'config' must be None, XML string, " \
                             "or Element, but not '{}'" \
                             .format(type(config)))
-        self.validate_config()
+        #self.validate_config()
 
     def __repr__(self):
         return '<{}.{} {} at {}>'.format(self.__class__.__module__,
