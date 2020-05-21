@@ -161,14 +161,16 @@ class BaseCalculator(object):
         for child in node_one.getchildren():
             key = build_unique_id(child)
             if key in ones:
-                raise Exception()
+                raise ConfigError('not unique peer of node {} {}' \
+                    .format(child, ones[key]))
             ones[key] = child
 
         twos = {}
         for child in node_two.getchildren():
             key = build_unique_id(child)
             if key in twos:
-                raise Exception()
+                raise ConfigError('not unique peer of node {} {}' \
+                                  .format(child, twos[key]))
             twos[key] = child
 
         return [(ones.get(uid, None), twos.get(uid, None)) for uid in set(ones.keys()).union(set(twos.keys()))]
