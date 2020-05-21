@@ -111,14 +111,17 @@ class BaseCalculator(object):
                 if child in new_scope]
 
     def _pair_childern(self, node_one, node_two):
-        # construct correctly keyed dict, for node_one:
+        """ pair all children with their peers, resulting in a list of Tuples
+        """
+        # Hash based approach, build two hashtables and match
         # keys are (tag, self-key)
-        # self key is
+        # self-key is
         #    text for leaf-list
         #    key tuple for list
         #    none for others
 
         def find_one_child(node, tag):
+            """ Find exactly one child with the given tag"""
             s = list(node.iterchildren(tag=tag))
             if len(s) < 1:
                 raise ConfigError("cannot find key '{}' in node {}" \
@@ -131,11 +134,23 @@ class BaseCalculator(object):
             return s[0]
 
         def build_index_tuple(node, keys, s_node):
+            """
+            build a tuple containing the text of all fields listed in keys, taken from node
+
+            s_node is passed to prevent it being looked up twice.
+            """
             out = [self._parse_text(find_one_child(node, k), s_node) for k in keys]
             return tuple(out)
 
         type_for_tag = {}
         def get_type_for_tag(tag, child):
+            """
+            Given a child node with a given tag, find the type
+
+            caches based on tag
+
+            :return: a tuple, containing the s_node and node type
+            """
             node_type = type_for_tag.get(tag, None)
             if node_type is not None:
                 return node_type
@@ -147,6 +162,9 @@ class BaseCalculator(object):
             return result
 
         def build_unique_id(child):
+            """
+            Build the hash key for a node
+            """
             tag = child.tag
             key = None
             s_node, node_type = get_type_for_tag(tag, child)
@@ -157,6 +175,7 @@ class BaseCalculator(object):
                 key = build_index_tuple(child, keys, s_node)
             return (tag, key)
 
+        # build the hashmap for node_one
         ones = {}
         for child in node_one.getchildren():
             key = build_unique_id(child)
@@ -165,6 +184,7 @@ class BaseCalculator(object):
                     .format(child, ones[key]))
             ones[key] = child
 
+        # build the hashmap for node_two
         twos = {}
         for child in node_two.getchildren():
             key = build_unique_id(child)
@@ -173,6 +193,7 @@ class BaseCalculator(object):
                                   .format(child, twos[key]))
             twos[key] = child
 
+        # make pairs
         return [(ones.get(uid, None), twos.get(uid, None)) for uid in set(ones.keys()).union(set(twos.keys()))]
 
 
