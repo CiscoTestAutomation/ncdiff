@@ -115,6 +115,7 @@ class ModelDevice(manager.Manager):
 
     @property
     @lru_cache(maxsize=1)
+    # extremely expensive call, cache
     def namespaces(self):
         if self.compiler is None:
             raise ValueError('please first call scan_models() to build ' \

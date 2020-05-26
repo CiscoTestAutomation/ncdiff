@@ -111,7 +111,23 @@ class BaseCalculator(object):
                 if child in new_scope]
 
     def _pair_childern(self, node_one, node_two):
-        """ pair all children with their peers, resulting in a list of Tuples
+        """_pair_childern
+         pair all children with their peers, resulting in a list of Tuples
+
+         Parameters
+        ----------
+        node_one : `Element`
+            An Element node in one Config instance.
+
+        node_two : `Element`
+            An Element node in the other Config instance.
+
+        Returns
+        -------
+
+        list
+            List of matching pairs, one of both items in the pair can be None
+
         """
         # Hash based approach, build two hashtables and match
         # keys are (tag, self-key)
@@ -193,9 +209,11 @@ class BaseCalculator(object):
                                   .format(child, twos[key]))
             twos[key] = child
 
-        # make pairs
-        return [(ones.get(uid, None), twos.get(uid, None)) for uid in set(ones.keys()).union(set(twos.keys()))]
-
+        # make pairs, in order
+        one_lookup = set(ones.keys())
+        keys_in_order = list(ones.keys())
+        keys_in_order.extend([two for two in twos.keys() if two not in one_lookup])
+        return [(ones.get(uid, None), twos.get(uid, None)) for uid in keys_in_order]
 
     def _group_kids(self, node_one, node_two):
         '''_group_kids
@@ -340,6 +358,7 @@ class BaseCalculator(object):
         return True
 
     @lru_cache(maxsize=1024)
+    # cache because this is an expensive call, often called multiple times on the same node in rapid succession
     def _parse_text(self, node, schema_node=None):
         '''_parse_text
 
@@ -509,10 +528,11 @@ class BaseCalculator(object):
                 return False
             # both are present
             schma_node = self.device.get_schema_node(child)
-            if schma_node.get('ordered-by') == 'user' and \
-                    schma_node.get('type') == 'leaf-list' or \
-                    schma_node.get('ordered-by') == 'user' and \
-                    schma_node.get('type') == 'list':
+            ordered_by = schma_node.get('ordered-by')
+            child_type = schma_node.get('type')
+            if ordered_by == 'user' and (
+                    child_type == 'leaf-list' or
+                    child_type == 'list'):
                 elder_siblings = list(child.itersiblings(tag=child.tag,
                                                          preceding=True))
                 if elder_siblings:
