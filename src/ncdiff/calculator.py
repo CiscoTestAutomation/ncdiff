@@ -110,8 +110,8 @@ class BaseCalculator(object):
         return [child for child in parent.iterchildren(tag=tag)
                 if child in new_scope]
 
-    def _pair_childern(self, node_one, node_two):
-        """_pair_childern
+    def _pair_children(self, node_one, node_two):
+        """_pair_children
          pair all children with their peers, resulting in a list of Tuples
 
          Parameters
@@ -248,7 +248,7 @@ class BaseCalculator(object):
         in_2_not_in_1 = []
         in_1_and_in_2 = []
 
-        for one, two in self._pair_childern(node_one, node_two):
+        for one, two in self._pair_children(node_one, node_two):
             if one is None:
                 in_2_not_in_1.append(two)
             elif two is None:
@@ -519,7 +519,7 @@ class BaseCalculator(object):
             if a not in node_other.attrib or \
                node_self.attrib[a] != node_other.attrib[a]:
                 return False
-        for child, child_other in self._pair_childern(node_self, node_other):
+        for child, child_other in self._pair_children(node_self, node_other):
             if child is None:
                 # only in other, meaningless
                 continue
