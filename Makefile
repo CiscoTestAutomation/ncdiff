@@ -1,25 +1,31 @@
-###############################################################################
-#                            yang Internal Makefile
+################################################################################
+#                                                                              #
+#                      Cisco Systems Proprietary Software                      #
+#        Not to be distributed without consent from Test Technology            #
+#                               Cisco Systems, Inc.                            #
+#                                                                              #
+################################################################################
+#                            ncdiff Makefile
 #
 # Author:
-#   Jonathan Yang (yuekyang) - CSG Polaris DMI Infra
+#   pyats-support@cisco.com
 #
 # Support:
-#	yang-python@cisco.com
+#   pyats-support@cisco.com
 #
 # Version:
-#   v2.0.0
+#   v3.0
 #
 # Date:
-#   May 2018
+#   June 2020
 #
 # About This File:
-#   This script will build the dyntopo package for distribution in PyPI server
+#   This script will build the ncdiff package for distribution in PyPI server
 #
 # Requirements:
 #	1. Module name is the same as package name.
 #	2. setup.py file is stored within the module folder
-###############################################################################
+################################################################################
 
 # Variables
 PKG_NAME      = ncdiff
