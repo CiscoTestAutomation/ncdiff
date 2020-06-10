@@ -58,7 +58,7 @@ class Config(object):
         `{url}tagname` notation, and values are corresponding model names.
     '''
 
-    def __init__(self, ncdevice, config=None):
+    def __init__(self, ncdevice, config=None, validate=True):
         '''
         __init__ instantiates a Config instance.
         '''
@@ -78,7 +78,8 @@ class Config(object):
             raise TypeError("argument 'config' must be None, XML string, " \
                             "or Element, but not '{}'" \
                             .format(type(config)))
-        self.validate_config()
+        if validate:
+            self.validate_config()
 
     def __repr__(self):
         return '<{}.{} {} at {}>'.format(self.__class__.__module__,
@@ -92,7 +93,7 @@ class Config(object):
                               pretty_print=True)
 
     def __bool__(self):
-        d = Config(self.device, None)
+        d = Config(self.device, None, False)
         if self == d:
             return False
         else:
@@ -103,21 +104,21 @@ class Config(object):
             if ConfigCompatibility(self, other).is_compatible:
                 return Config(self.device,
                               NetconfCalculator(self.device,
-                                                self.ele, other.ele).add)
+                                                self.ele, other.ele).add, False)
         elif isinstance(other, ConfigDelta):
             if ConfigCompatibility(self, other).is_compatible:
                 return Config(self.device,
                               NetconfCalculator(self.device,
-                                                self.ele, other.nc).add)
+                                                self.ele, other.nc).add, False)
         elif etree.iselement(other):
             return Config(self.device,
-                          NetconfCalculator(self.device, self.ele, other).add)
+                          NetconfCalculator(self.device, self.ele, other).add, False)
         elif isinstance(other, Request):
             return Config(self.device,
-                          RestconfCalculator(self.device, self.ele, other).add)
+                          RestconfCalculator(self.device, self.ele, other).add, False)
         elif isinstance(other, SetRequest):
             return Config(self.device,
-                          gNMICalculator(self.device, self.ele, other).add)
+                          gNMICalculator(self.device, self.ele, other).add, False)
         else:
             return NotImplemented
 

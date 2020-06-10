@@ -1,5 +1,7 @@
 import os
 import re
+from functools import lru_cache
+
 import six
 import logging
 from lxml import etree
@@ -112,6 +114,8 @@ class ModelDevice(manager.Manager):
                                              hex(id(self)))
 
     @property
+    @lru_cache(maxsize=1)
+    # extremely expensive call, cache
     def namespaces(self):
         if self.compiler is None:
             raise ValueError('please first call scan_models() to build ' \
@@ -570,10 +574,11 @@ class ModelDevice(manager.Manager):
             return True
 
         n = Composer(self, config_node)
-        config_path_str = ' '.join(n.path)
+        path = n.path
+        config_path_str = ' '.join(path)
         if config_path_str in self.nodes:
             return self.nodes[config_path_str]
-        if len(n.path) > 1:
+        if len(path) > 1:
             parent = self.get_schema_node(config_node.getparent())
             child = get_child(parent, config_node.tag)
             if child is None:
