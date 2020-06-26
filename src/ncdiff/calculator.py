@@ -385,7 +385,7 @@ class BaseCalculator(object):
         if schema_node is None:
             schema_node = self.device.get_schema_node(node)
         if schema_node.get('datatype') is not None and \
-          (schema_node.get('datatype')[:11] == 'identityref' or schema_node.get('datatype')[:3] == '-> '):
+          (schema_node.get('datatype')[:11] == 'identityref'):
             idref = IdentityRef(self.device, node)
             return idref.default
         elif schema_node.get('datatype') is not None and \
