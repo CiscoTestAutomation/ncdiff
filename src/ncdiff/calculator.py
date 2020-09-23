@@ -140,9 +140,11 @@ class BaseCalculator(object):
             """ Find exactly one child with the given tag"""
             s = list(node.iterchildren(tag=tag))
             if len(s) < 1:
-                raise ConfigError("cannot find key '{}' in node {}" \
+                raise ConfigError("cannot find key '{}' in node {} under {}" \
                                   .format(tag,
-                                          self.device.get_xpath(node)))
+                                          node.tag,
+                                          self.device \
+                                              .get_xpath(node.getparent())))
             if len(s) > 1:
                 raise ConfigError("not unique key '{}' in node {}" \
                                   .format(tag,
