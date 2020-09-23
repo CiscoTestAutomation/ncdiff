@@ -273,6 +273,13 @@ class Config(object):
                child_schema_node.get('type') == 'container' and \
                child_schema_node.get('presence') != 'true':
                 self.ele.remove(child)
+            elif len(child) == 0 and \
+                 child_schema_node.get('type') == 'list':
+                logger.warning("empty list entry {} under {} is pruned" \
+                               .format(child.tag,
+                                       self.device \
+                                           .get_xpath(child.getparent())))
+                self.ele.remove(child)
 
     def ns_help(self):
         '''ns_help
@@ -384,6 +391,13 @@ class Config(object):
             if len(child) == 0 and \
                child_schema_node.get('type') == 'container' and \
                child_schema_node.get('presence') != 'true':
+                node.remove(child)
+            elif len(child) == 0 and \
+               child_schema_node.get('type') == 'list':
+                logger.warning("empty list entry {} under {} is pruned" \
+                               .format(child.tag,
+                                       self.device \
+                                           .get_xpath(child.getparent())))
                 node.remove(child)
 
     def _node_filter(self, node, ancestors, filtrates):
