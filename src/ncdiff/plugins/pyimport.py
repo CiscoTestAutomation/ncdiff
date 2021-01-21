@@ -52,7 +52,7 @@ class PyImportPlugin(plugin.PyangPlugin):
 
     def emit(self, ctx, modules, fd):
         if ctx.opts.tree_path is not None:
-            path = string.split(ctx.opts.tree_path, '/')
+            path = ctx.opts.tree_path.split('/')
             if path[0] == '':
                 path = path[1:]
         else:
@@ -116,5 +116,13 @@ class PyImportPlugin(plugin.PyangPlugin):
             _revision = ET.Element('revision')
             _revision.set('date', rev.arg)
             _revisions.append(_revision)
+
+        # module belongs-to statement
+        belongs_to_stmts = module.search("belongs-to")
+        if belongs_to_stmts:
+            _belongs_to = ET.Element('belongs-to')
+            for belongs_to in belongs_to_stmts:
+                _belongs_to.set('module', belongs_to.arg)
+            _module.append(_belongs_to)
 
         return _module
