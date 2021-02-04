@@ -228,6 +228,9 @@ class Cxml:
             node.set(flags[0], flags[1])
 
         node.set('type', s.keyword)
+        status = self.get_status_str(s)
+        if status[1] != 'current':
+            node.set(status[0], status[1])
         if s.keyword == 'list':
             if s.search_one('key') is not None:
                 node.set('key', s.search_one('key').arg)
