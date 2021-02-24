@@ -101,7 +101,7 @@ class ModelDevice(manager.Manager):
         supported_args = ['timeout', 'async_mode' , 'raise_mode']
         for arg in supported_args:
             if arg in kwargs:
-                setattr(self, kwarg, kwargs[arg])
+                setattr(self, arg, kwargs[arg])
 
         self.models = {}
         self.nodes = {}
