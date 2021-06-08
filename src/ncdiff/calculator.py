@@ -45,6 +45,7 @@ class BaseCalculator(object):
         self.device = device
         self.etree1 = etree1
         self.etree2 = etree2
+        self.__attach_per_instance_cache()
 
     @staticmethod
     def _del_attrib(element):
@@ -359,7 +360,23 @@ class BaseCalculator(object):
                 return False
         return True
 
-    @lru_cache(maxsize=1024)
+    def __attach_per_instance_cache(self):
+        """
+        We want to cache _parse_text, as it is an expensive call
+
+        Python functools conveniently provides the @lru_cache annotation
+        (and no other way of having a pre-made lru_cache)
+
+        The lru_cache annotation however locks all arguments in memory, including self
+        This causes both trees for this calculator to be locked in memory
+
+        We want to use the @lru_cache annotation, but release the cache when this calculator is garbage collected
+        For this, we use the following construction:
+        https://stackoverflow.com/questions/14946264/python-lru-cache-decorator-per-instance
+        """
+
+        self._parse_text = lru_cache(maxsize=128)(self._parse_text)
+
     # cache because this is an expensive call, often called multiple times on the same node in rapid succession
     def _parse_text(self, node, schema_node=None):
         '''_parse_text
