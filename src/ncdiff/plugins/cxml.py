@@ -274,6 +274,9 @@ class Cxml:
                 tv = self.type_values(t)
                 if tv != '':
                     node.set('values', tv)
+                if t.arg == 'union':
+                    ut = self.type_union_member_types(t)
+                    node.set('unionmembertypes', ut)
 
             if s.keyword == 'leaf-list':
                 o = s.search_one('ordered-by')
@@ -366,6 +369,10 @@ class Cxml:
                 return t.arg
         else:
             return ''
+
+    def type_union_member_types(self, t):
+        membertypes = [m.arg for m in t.search('type')]
+        return '|'.join(membertypes)
 
     def type_enums(self, t):
         tv = ''
