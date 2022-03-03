@@ -628,12 +628,16 @@ class ModelCompiler(object):
         self.build_dependencies()
 
     def _xml_from_cache(self, name):
-        cached_name = os.path.join(self.dir_yang, f"{name}.xml")
-        if os.path.exists(cached_name):
-            with(open(cached_name, "r", encoding="utf-8")) as fh:
-                parser = etree.XMLParser(remove_blank_text=True)
-                tree = etree.XML(fh.read(), parser)
-                return tree
+        try:
+            cached_name = os.path.join(self.dir_yang, f"{name}.xml")
+            if os.path.exists(cached_name):
+                with(open(cached_name, "r", encoding="utf-8")) as fh:
+                    parser = etree.XMLParser(remove_blank_text=True)
+                    tree = etree.XML(fh.read(), parser)
+                    return tree
+        except Exception:
+            # make the cache safe: any failure will just bypass the cache
+            logger.info(f"Unexpected failure during cache read of {name}, refreshing cache", exc_info=True)
         return None
 
     def _to_cache(self, name, value):
