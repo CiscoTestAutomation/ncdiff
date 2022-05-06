@@ -307,6 +307,7 @@ class ModelDevice(manager.Manager):
                     xml = f.read()
                 parser = etree.XMLParser(remove_blank_text=True)
                 tree = etree.XML(xml, parser)
+                m = Model(tree)
             else:
                 raise ValueError("'{}' is not a file with extension 'xml'" \
                                  .format(model))
