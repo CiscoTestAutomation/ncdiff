@@ -1,6 +1,5 @@
 import re
 import logging
-from copy import deepcopy
 from collections import OrderedDict
 
 # create a logger for this module
@@ -11,15 +10,15 @@ class DictDiff(object):
     '''DictDiff
 
     Abstraction of diff between two dictionaries. If all keys and their values
-    are same, two dictionaries are considered to be same. This class is intended
-    to be used by class RunningConfigDiff.
+    are same, two dictionaries are considered to be same. This class is
+    intended to be used by class RunningConfigDiff.
 
     Attributes
     ----------
-    diff : `tuple`
-        A tuple with two elements. First one is a dictionary that contains
-        content in dict1 but not in dict2. Second one is a dictionary that
-        contains content in dict2 but not in dict1.
+    diff : `OrderedDict`
+        A nested OrderedDict. When a leaf has a value '+' or '-' it means the
+        leaf is added or deleted. When a child OrderedDict has a key '' with
+        a value '+' or '-', it means the child OrderedDict is added or deleted.
     '''
 
     def __init__(self, dict1, dict2):
@@ -28,31 +27,61 @@ class DictDiff(object):
 
     @property
     def diff(self):
-        diff1 = deepcopy(self.dict1)
-        diff2 = deepcopy(self.dict2)
-        self.simplify_single_dict(diff1, diff2)
-        return (diff1, diff2)
+        return self.compare(self.dict1, self.dict2)
 
     @staticmethod
-    def simplify_single_dict(dict1, dict2):
-        common_keys = set(dict1.keys()) & set(dict2.keys())
-        for key in common_keys:
-            if dict1[key] == dict2[key]:
-                del dict1[key]
-                del dict2[key]
+    def compare(dict1, dict2):
+        diff = OrderedDict()
+        common_key_list = [k for k in dict1.keys() if k in dict2]
+        key_list_1 = list(dict1.keys())
+        key_list_2 = list(dict2.keys())
+        previous_index_1 = previous_index_2 = 0
+        for key in common_key_list:
+            current_index_1 = key_list_1.index(key)
+            for k in key_list_1[previous_index_1:current_index_1]:
+                if isinstance(dict1[k], dict):
+                    diff[k] = OrderedDict([('', '-')] + list(dict1[k].items()))
+                else:
+                    diff[k] = '-'
+            previous_index_1 = current_index_1 + 1
+            current_index_2 = key_list_2.index(key)
+            for k in key_list_2[previous_index_2:current_index_2]:
+                if isinstance(dict2[k], dict):
+                    diff[k] = OrderedDict([('', '+')] + list(dict2[k].items()))
+                else:
+                    diff[k] = '+'
+            previous_index_2 = current_index_2 + 1
+            if dict1[key] != dict2[key]:
+                if (
+                    isinstance(dict1[key], dict) and
+                    isinstance(dict2[key], dict)
+                ):
+                    diff[key] = DictDiff.compare(dict1[key], dict2[key])
+                elif isinstance(dict1[key], dict):
+                    diff[key] = OrderedDict(list(dict1[key].items()))
+                    for k in dict1[key]:
+                        if isinstance(dict1[key][k], dict):
+                            diff[key][k][''] = '-'
+                        else:
+                            diff[key][k] = '-'
+                elif isinstance(dict2[key], dict):
+                    diff[key] = OrderedDict(list(dict2[key].items()))
+                    for k in dict2[key]:
+                        if isinstance(dict2[key][k], dict):
+                            diff[key][k][''] = '+'
+                        else:
+                            diff[key][k] = '+'
+        for k in key_list_1[previous_index_1:]:
+            if isinstance(dict1[k], dict):
+                diff[k] = OrderedDict([('', '-')] + list(dict1[k].items()))
             else:
-                child1_is_dict = isinstance(dict1[key], dict)
-                child2_is_dict = isinstance(dict2[key], dict)
-                if child1_is_dict and child2_is_dict:
-                    DictDiff.simplify_single_dict(dict1[key], dict2[key])
-                    if not dict1[key]:
-                        del dict1[key]
-                    if not dict2[key]:
-                        del dict2[key]
-                elif child1_is_dict and not child2_is_dict:
-                    del dict2[key]
-                elif child2_is_dict and not child1_is_dict:
-                    del dict1[key]
+                diff[k] = '-'
+        for k in key_list_2[previous_index_2:]:
+            if isinstance(dict2[k], dict):
+                diff[k] = OrderedDict([('', '+')] + list(dict2[k].items()))
+            else:
+                diff[k] = '+'
+        return diff
 
 
 class RunningConfigDiff(object):
@@ -70,10 +99,8 @@ class RunningConfigDiff(object):
     running2 : `str`
         Second Cisco running-config.
 
-    diff : `tuple`
-        A tuple with two elements. First one is the running-config in running1
-        but not in running2. Second one is the running-config in running2 but
-        not in running1.
+    diff : `OrderedDict`
+        A OrderedDict from class DictDiff attribute diff.
     '''
 
     def __init__(self, running1, running2):
@@ -92,9 +119,7 @@ class RunningConfigDiff(object):
             return False
 
     def __str__(self):
-        diff1, diff2 = self.diff
-        return '\n'.join(['-   ' + l for l in diff1.splitlines()] +
-                         ['+   ' + l for l in diff2.splitlines()])
+        return self.dict2config(self.diff, diff_type=' ')
 
     def __eq__(self, other):
         if str(self) == str(other):
@@ -107,8 +132,10 @@ class RunningConfigDiff(object):
         dict1 = self.running2dict(self.running1)
         dict2 = self.running2dict(self.running2)
         diff_dict = DictDiff(dict1, dict2)
-        diff1, diff2 = diff_dict.diff
-        return (self.dict2running(diff1), self.dict2running(diff2))
+        if 'running-config' in diff_dict.diff:
+            return diff_dict.diff['running-config']
+        else:
+            return None
 
     def running2dict(self, str_in):
         str_in = str_in.replace('exit-address-family', ' exit-address-family')
@@ -147,26 +174,48 @@ class RunningConfigDiff(object):
                     if last_indentation > 0:
                         dict_ret[last_line] = self.config2dict(last_section)
                     else:
-                        dict_ret[last_line] = ''
+                        dict_ret[last_line] = ' '
                 last_line = line
                 last_section = ''
                 last_indentation = 0
         if last_indentation > 0:
             dict_ret[last_line] = self.config2dict(last_section)
         else:
-            dict_ret[last_line] = ''
+            dict_ret[last_line] = ' '
         return dict_ret
 
-    def dict2config(self, dict_in):
+    def dict2config(self, dict_in, diff_type=None):
         str_ret = ''
+        if dict_in is None:
+            return str_ret
         for k, v in dict_in.items():
-            str_ret += k + '\n'
-            if type(v) is OrderedDict:
-                str_ret += self.indent(self.dict2config(v))
+            if k == '':
+                continue
+            if diff_type == ' ':
+                if isinstance(v, dict):
+                    local_diff_type = v.get('', ' ')
+                else:
+                    local_diff_type = v
+            else:
+                local_diff_type = diff_type
+            if diff_type is not None:
+                str_ret += local_diff_type + ' ' + k + '\n'
+            else:
+                str_ret += k + '\n'
+            if isinstance(v, dict):
+                str_ret += self.indent(
+                    self.dict2config(v, diff_type=local_diff_type),
+                )
         return str_ret
 
     def indent(self, str_in):
         str_ret = ''
         for line in str_in.splitlines():
-            str_ret += ' ' + line + '\n'
+            if line:
+                if line[0] in '-+':
+                    diff_type = line[0]
+                    line = line[1:]
+                    str_ret += diff_type + '  ' + line + '\n'
+                else:
+                    str_ret += '  ' + line + '\n'
         return str_ret
