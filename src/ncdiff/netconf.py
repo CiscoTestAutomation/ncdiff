@@ -1,5 +1,4 @@
 import re
-import pprint
 import logging
 from lxml import etree
 from copy import deepcopy
@@ -20,17 +19,19 @@ insert_tag = '{' + yang_url + '}insert'
 value_tag = '{' + yang_url + '}value'
 key_tag = '{' + yang_url + '}key'
 
+
 def _inserterror(direction, path, attr_name, attr_value=None):
     if attr_value:
-        raise ConfigDeltaError("attribute wrong: try to insert the node " \
-                               "{} {} another node, which cannot be found " \
-                               "by attribute '{}={}'" \
+        raise ConfigDeltaError("attribute wrong: try to insert the node "
+                               "{} {} another node, which cannot be found "
+                               "by attribute '{}={}'"
                                .format(path, direction, attr_name, attr_value))
     else:
-        raise ConfigDeltaError("attribute missing: try to insert the node " \
-                               "{} {} another node, but it does not have " \
-                               "attribute '{}'" \
+        raise ConfigDeltaError("attribute missing: try to insert the node "
+                               "{} {} another node, but it does not have "
+                               "attribute '{}'"
                                .format(path, direction, attr_name))
+
 
 def _copy_element(new_parent, element):
     new_child = etree.SubElement(new_parent, element.tag,
@@ -40,6 +41,7 @@ def _copy_element(new_parent, element):
         new_child.text = element.text
     for subelement in element:
         _copy_element(new_child, subelement)
+
 
 def _copy_elements(new_parent, elements):
     for element in elements:
@@ -94,19 +96,19 @@ class NetconfParser(object):
         '''
 
         if not etree.iselement(element):
-            raise TypeError("argument 'element' must be Element not '{}'" \
+            raise TypeError("argument 'element' must be Element not '{}'"
                             .format(type(element)))
         ret = etree.Element(config_tag, nsmap={'nc': nc_url})
         _copy_elements(ret, element.xpath('/nc:rpc-reply/nc:data/*',
-                            namespaces={'nc': nc_url}))
+                       namespaces={'nc': nc_url}))
         _copy_elements(ret, element.xpath('/nc:data/*',
-                            namespaces={'nc': nc_url}))
+                       namespaces={'nc': nc_url}))
         _copy_elements(ret, element.xpath('/nc:config/*',
-                            namespaces={'nc': nc_url}))
+                       namespaces={'nc': nc_url}))
         _copy_elements(ret, element.xpath('/nc:rpc/nc:edit-config/nc:config/*',
-                            namespaces={'nc': nc_url}))
+                       namespaces={'nc': nc_url}))
         _copy_elements(ret, element.xpath('/nc:edit-config/nc:config/*',
-                            namespaces={'nc': nc_url}))
+                       namespaces={'nc': nc_url}))
         return ret
 
 
@@ -121,8 +123,8 @@ class NetconfCalculator(BaseCalculator):
     Attributes
     ----------
     sub : `Element`
-        Content of a Netconf edit-config which can achieve a transition from one
-        config, i.e., self.etree2, to another config, i.e., self.etree1.
+        Content of a Netconf edit-config which can achieve a transition from
+        one config, i.e., self.etree2, to another config, i.e., self.etree1.
 
     add : `Element`
         Content of a Config instance.
@@ -152,17 +154,17 @@ class NetconfCalculator(BaseCalculator):
         if preferred_create in ['merge', 'create', 'replace']:
             self.preferred_create = preferred_create
         else:
-            raise ValueError("only 'merge', 'create' or 'replace' are valid " \
+            raise ValueError("only 'merge', 'create' or 'replace' are valid "
                              "values of 'preferred_create'")
         if preferred_replace in ['merge', 'replace']:
             self.preferred_replace = preferred_replace
         else:
-            raise ValueError("only 'merge' or 'replace' are valid " \
+            raise ValueError("only 'merge' or 'replace' are valid "
                              "values of 'preferred_replace'")
         if preferred_delete in ['delete', 'remove']:
             self.preferred_delete = preferred_delete
         else:
-            raise ValueError("only 'delete' or 'remove' are valid " \
+            raise ValueError("only 'delete' or 'remove' are valid "
                              "values of 'preferred_delete'")
 
     @property
@@ -218,47 +220,64 @@ class NetconfCalculator(BaseCalculator):
 
             # delete
             if this_operation == 'delete':
-                raise ConfigDeltaError('data-missing: try to delete node {} ' \
-                                       'but it does not exist in config' \
-                                       .format(self.device \
-                                                   .get_xpath(child_other)))
+                raise ConfigDeltaError(
+                    'data-missing: try to delete node {} but it does not '
+                    'exist in config'.format(
+                        self.device.get_xpath(child_other)
+                    )
+                )
 
             # remove
             elif this_operation == 'remove':
                 pass
 
             # merge, create, replace or none
-            elif this_operation == 'merge' or \
-               this_operation == 'replace' or \
-               this_operation == 'create':
+            elif (
+                this_operation == 'merge' or
+                this_operation == 'replace' or
+                this_operation == 'create'
+            ):
                 s_node = self.device.get_schema_node(child_other)
                 if s_node.get('type') in supported_node_type:
-                    getattr(self,
-                            '_node_add_without_peer_{}' \
-                            .format(s_node.get('type').replace('-', ''))) \
-                            (node_sum, child_other)
+                    getattr(
+                        self,
+                        '_node_add_without_peer_{}'.format(
+                            s_node.get('type').replace('-', '')
+                        )
+                    )(node_sum, child_other)
 
             else:
-                raise ConfigDeltaError("unknown operation: node {} contains " \
-                                       "operation '{}'" \
-                                       .format(self.device \
-                                                   .get_xpath(child_other),
-                                               this_operation))
+                raise ConfigDeltaError(
+                    "unknown operation: node {} contains operation "
+                    "'{}'".format(
+                        self.device.get_xpath(child_other),
+                        this_operation
+                    )
+                )
 
         for child_self, child_other in in_s_and_in_o:
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') in supported_node_type:
-                getattr(self,
-                        '_node_add_with_peer_{}' \
-                        .format(s_node.get('type').replace('-', ''))) \
-                        (child_self, child_other)
+                getattr(
+                    self,
+                    '_node_add_with_peer_{}'.format(
+                        s_node.get('type').replace('-', '')
+                    )
+                )(child_self, child_other)
+
+            if not list(child_self):
+                if (
+                    s_node.get('type') == 'container' and
+                    s_node.get('presence') != 'true'
+                ):
+                    node_sum.remove(child_self)
 
     def _node_add_without_peer_leaf(self, node_sum, child_other):
         '''_node_add_without_peer_leaf
 
-        Low-level api: Apply delta child_other to node_sum when there is no peer
-        of child_other can be found under node_sum. child_other is a leaf node.
-        Element node_sum will be modified during the process.
+        Low-level api: Apply delta child_other to node_sum when there is no
+        peer of child_other can be found under node_sum. child_other is a leaf
+        node. Element node_sum will be modified during the process.
 
         Parameters
         ----------
@@ -283,9 +302,9 @@ class NetconfCalculator(BaseCalculator):
     def _node_add_without_peer_leaflist(self, node_sum, child_other):
         '''_node_add_without_peer_leaflist
 
-        Low-level api: Apply delta child_other to node_sum when there is no peer
-        of child_other can be found under node_sum. child_other is a leaf-list
-        node. Element node_sum will be modified during the process.
+        Low-level api: Apply delta child_other to node_sum when there is no
+        peer of child_other can be found under node_sum. child_other is a
+        leaf-list node. Element node_sum will be modified during the process.
 
         Parameters
         ----------
@@ -353,9 +372,9 @@ class NetconfCalculator(BaseCalculator):
     def _node_add_without_peer_container(self, node_sum, child_other):
         '''_node_add_without_peer_container
 
-        Low-level api: Apply delta child_other to node_sum when there is no peer
-        of child_other can be found under node_sum. child_other is a container
-        node. Element node_sum will be modified during the process.
+        Low-level api: Apply delta child_other to node_sum when there is no
+        peer of child_other can be found under node_sum. child_other is a
+        container node. Element node_sum will be modified during the process.
 
         Parameters
         ----------
@@ -379,16 +398,18 @@ class NetconfCalculator(BaseCalculator):
             e = etree.SubElement(node_sum, child_other.tag,
                                  nsmap=child_other.nsmap)
             self.node_add(e, child_other)
-        elif this_operation == 'replace' or \
-             this_operation == 'create':
+        elif (
+            this_operation == 'replace' or
+            this_operation == 'create'
+        ):
             node_sum.append(self._del_attrib(deepcopy(child_other)))
 
     def _node_add_without_peer_list(self, node_sum, child_other):
         '''_node_add_without_peer_list
 
-        Low-level api: Apply delta child_other to node_sum when there is no peer
-        of child_other can be found under node_sum. child_other is a list node.
-        Element node_sum will be modified during the process.
+        Low-level api: Apply delta child_other to node_sum when there is no
+        peer of child_other can be found under node_sum. child_other is a list
+        node. Element node_sum will be modified during the process.
 
         Parameters
         ----------
@@ -415,8 +436,10 @@ class NetconfCalculator(BaseCalculator):
                 key_ele_other = child_other.find(list_key_tag)
                 key_ele_self = deepcopy(key_ele_other)
                 e.append(self._del_attrib(key_ele_self))
-        elif this_operation == 'replace' or \
-             this_operation == 'create':
+        elif (
+            this_operation == 'replace' or
+            this_operation == 'create'
+        ):
             e = self._del_attrib(deepcopy(child_other))
         scope = node_sum.getchildren()
         siblings = self._get_sequence(scope, child_other.tag, node_sum)
@@ -495,16 +518,18 @@ class NetconfCalculator(BaseCalculator):
         elif this_operation == 'replace':
             self._merge_text(child_other, child_self)
         elif this_operation == 'create':
-            raise ConfigDeltaError('data-exists: try to create node {} but ' \
-                                   'it already exists' \
+            raise ConfigDeltaError('data-exists: try to create node {} but '
+                                   'it already exists'
                                    .format(self.device.get_xpath(child_other)))
-        elif this_operation == 'delete' or \
-             this_operation == 'remove':
+        elif (
+            this_operation == 'delete' or
+            this_operation == 'remove'
+        ):
             parent_self = child_self.getparent()
             parent_self.remove(child_self)
         else:
-            raise ConfigDeltaError("unknown operation: node {} contains " \
-                                   "operation '{}'" \
+            raise ConfigDeltaError("unknown operation: node {} contains "
+                                   "operation '{}'"
                                    .format(self.device.get_xpath(child_other),
                                            this_operation))
 
@@ -513,8 +538,8 @@ class NetconfCalculator(BaseCalculator):
 
         Low-level api: Apply delta child_other to child_self when child_self is
         the peer of child_other. Element child_self and child_other are
-        leaf-list nodes. Element child_self will be modified during the process.
-        RFC6020 section 7.7.7 is a reference of this method.
+        leaf-list nodes. Element child_self will be modified during the
+        process. RFC6020 section 7.7.7 is a reference of this method.
 
         Parameters
         ----------
@@ -581,15 +606,17 @@ class NetconfCalculator(BaseCalculator):
                     if sibling[0] != child_self:
                         sibling[0].addnext(child_self)
         elif this_operation == 'create':
-            raise ConfigDeltaError('data-exists: try to create node {} but ' \
-                                   'it already exists' \
+            raise ConfigDeltaError('data-exists: try to create node {} but '
+                                   'it already exists'
                                    .format(self.device.get_xpath(child_other)))
-        elif this_operation == 'delete' or \
-             this_operation == 'remove':
+        elif (
+            this_operation == 'delete' or
+            this_operation == 'remove'
+        ):
             parent_self.remove(child_self)
         else:
-            raise ConfigDeltaError("unknown operation: node {} contains " \
-                                   "operation '{}'" \
+            raise ConfigDeltaError("unknown operation: node {} contains "
+                                   "operation '{}'"
                                    .format(self.device.get_xpath(child_other),
                                            this_operation))
 
@@ -598,8 +625,8 @@ class NetconfCalculator(BaseCalculator):
 
         Low-level api: Apply delta child_other to child_self when child_self is
         the peer of child_other. Element child_self and child_other are
-        container nodes. Element child_self will be modified during the process.
-        RFC6020 section 7.5.8 is a reference of this method.
+        container nodes. Element child_self will be modified during the
+        process. RFC6020 section 7.5.8 is a reference of this method.
 
         Parameters
         ----------
@@ -626,15 +653,17 @@ class NetconfCalculator(BaseCalculator):
             parent_self.replace(child_self,
                                 self._del_attrib(deepcopy(child_other)))
         elif this_operation == 'create':
-            raise ConfigDeltaError('data-exists: try to create node {} but ' \
-                                   'it already exists' \
+            raise ConfigDeltaError('data-exists: try to create node {} but '
+                                   'it already exists'
                                    .format(self.device.get_xpath(child_other)))
-        elif this_operation == 'delete' or \
-             this_operation == 'remove':
+        elif (
+            this_operation == 'delete' or
+            this_operation == 'remove'
+        ):
             parent_self.remove(child_self)
         else:
-            raise ConfigDeltaError("unknown operation: node {} contains " \
-                                   "operation '{}'" \
+            raise ConfigDeltaError("unknown operation: node {} contains "
+                                   "operation '{}'"
                                    .format(self.device.get_xpath(child_other),
                                            this_operation))
 
@@ -714,15 +743,17 @@ class NetconfCalculator(BaseCalculator):
             parent_self.replace(child_self,
                                 self._del_attrib(deepcopy(child_other)))
         elif this_operation == 'create':
-            raise ConfigDeltaError('data-exists: try to create node {} but ' \
-                                   'it already exists' \
+            raise ConfigDeltaError('data-exists: try to create node {} but '
+                                   'it already exists'
                                    .format(self.device.get_xpath(child_other)))
-        elif this_operation == 'delete' or \
-             this_operation == 'remove':
+        elif (
+            this_operation == 'delete' or
+            this_operation == 'remove'
+        ):
             parent_self.remove(child_self)
         else:
-            raise ConfigDeltaError("unknown operation: node {} contains " \
-                                   "operation '{}'" \
+            raise ConfigDeltaError("unknown operation: node {} contains "
+                                   "operation '{}'"
                                    .format(self.device.get_xpath(child_other),
                                            this_operation))
 
@@ -767,12 +798,14 @@ class NetconfCalculator(BaseCalculator):
                     return False
 
         if self.preferred_replace != 'merge':
-            t_self = [c.tag for c in list(node_self) \
-                      if self.device.get_schema_node(c).get('type') == \
-                         'leaf-list']
-            t_other = [c.tag for c in list(node_other) \
-                       if self.device.get_schema_node(c).get('type') == \
-                          'leaf-list']
+            t_self = [
+                c.tag for c in list(node_self)
+                if self.device.get_schema_node(c).get('type') == 'leaf-list'
+            ]
+            t_other = [
+                c.tag for c in list(node_other)
+                if self.device.get_schema_node(c).get('type') == 'leaf-list'
+            ]
             commonalities = set(t_self) & set(t_other)
             for commonality in commonalities:
                 if not same_leaf_list(commonality):
@@ -807,7 +840,8 @@ class NetconfCalculator(BaseCalculator):
                     ordered_by_user[s_node.tag] = keys
                 for key in keys:
                     key_node = child_self.find(key)
-                    e = etree.SubElement(child_other, key, nsmap=key_node.nsmap)
+                    e = etree.SubElement(
+                        child_other, key, nsmap=key_node.nsmap)
                     e.text = key_node.text
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
@@ -882,13 +916,15 @@ class NetconfCalculator(BaseCalculator):
                     self.node_sub(child_self, child_other)
             else:
                 path = self.device.get_xpath(s_node)
-                raise ModelError("unknown schema node type: type of node {}" \
+                raise ModelError("unknown schema node type: type of node {}"
                                  "is '{}'".format(path, s_node.get('type')))
         for tag in ordered_by_user:
             scope_s = in_s_not_in_o + in_s_and_in_o
             scope_o = in_o_not_in_s + in_s_and_in_o
-            for sequence in self._get_sequence(scope_s, tag, node_self), \
-                            self._get_sequence(scope_o, tag, node_other):
+            for sequence in (
+                self._get_sequence(scope_s, tag, node_self),
+                self._get_sequence(scope_o, tag, node_other),
+            ):
                 for item in sequence:
                     # modifying the namespace mapping of a node is not possible
                     # in lxml. See https://bugs.launchpad.net/lxml/+bug/555602
@@ -905,11 +941,15 @@ class NetconfCalculator(BaseCalculator):
                         else:
                             keys = ordered_by_user[tag]
                             key_nodes = {k: precursor.find(k) for k in keys}
-                            ids = {k: self._url_to_prefix(n, k) \
-                                   for k, n in key_nodes.items()}
-                            l = ["[{}='{}']".format(ids[k], key_nodes[k].text) \
-                                 for k in keys]
-                            item.set(key_tag, ''.join(l))
+                            ids = {
+                                k: self._url_to_prefix(n, k)
+                                for k, n in key_nodes.items()
+                            }
+                            id_list = [
+                                "[{}='{}']".format(ids[k], key_nodes[k].text)
+                                for k in keys
+                            ]
+                            item.set(key_tag, ''.join(id_list))
 
     @staticmethod
     def _url_to_prefix(node, id):
