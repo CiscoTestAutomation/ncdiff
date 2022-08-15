@@ -106,7 +106,7 @@ class ModelDevice(manager.Manager):
         self.nodes = {}
         self.compiler = None
         self._models_loadable = None
-        self.namespaces_cache = None
+        self._namespaces = None
 
     def __repr__(self):
         return '<{}.{} object at {}>'.format(self.__class__.__module__,
@@ -114,21 +114,20 @@ class ModelDevice(manager.Manager):
                                              hex(id(self)))
 
     @property
-    # extremely expensive call, cache
     def namespaces(self):
-        if self.namespaces_cache is not None:
-            return self.namespaces_cache
         if self.compiler is None:
-            raise ValueError('please first call scan_models() to build ' \
+            raise ValueError('please first call scan_models() to build '
                              'up supported namespaces of a device')
-        else:
-            device_namespaces = []
-            for m in self.compiler.dependencies.findall('./module'):
-                device_namespaces.append((m.get('id'),
-                                          m.get('prefix'),
-                                          m.findtext('namespace')))
-            self.namespaces_cache = device_namespaces
-            return device_namespaces
+        if self._namespaces is None:
+            self._namespaces = []
+            for m in self.compiler.context.dependencies.findall('./module'):
+                if m.get('prefix') is not None:
+                    self._namespaces.append((
+                        m.get('id'),
+                        m.get('prefix'),
+                        m.findtext('namespace')
+                    ))
+        return self._namespaces
 
     @property
     def models_loadable(self):
@@ -238,10 +237,13 @@ class ModelDevice(manager.Manager):
             A path to a folder that stores YANG files downloaded.
 
         download : `str`
-            A string is either `check` or `force`. If it is `check`, the content
-            in the folder is compared with self.server_capabilities. Downloading
-            will be skipped if the checking says good. If it is `force`,
-            downloading starts without checking.
+            A string is `check`, `force` or `ignore`. If it is `check`, the
+            content in the folder is compared with self.server_capabilities.
+            Downloading will be skipped if the checking says good. If it is
+            `force`, downloading starts without checking. Another option is
+            `ignore`, which allows the compiler to work on existing YANG files
+            in a folder without downloading.
+
 
         Returns
         -------
@@ -258,13 +260,18 @@ class ModelDevice(manager.Manager):
             >>> m.scan_models()
             ...
             >>>
+            >>> m = manager.connect(host='2.3.4.5', port=830,
+                                    username='admin', password='admin',
+                                    hostkey_verify=False, look_for_keys=False)
+            >>> m.scan_models(folder='/existing/yang', download='ignore')
+            >>> m.compiler.context.dependencies
+            <Element modules at 0x7fbc044b6600>
+            >>>
         '''
 
-        d = ModelDownloader(self, folder)
-        if download == 'force':
-            d.download_all(check_before_download=False)
-        elif download == 'check':
-            d.download_all(check_before_download=True)
+        if download in ['check', 'force']:
+            d = ModelDownloader(self, folder)
+            d.download_all(check_before_download=(download == 'check'))
         self.compiler = ModelCompiler(folder)
 
     def load_model(self, model):
@@ -693,6 +700,46 @@ class ModelDevice(manager.Manager):
         '''
 
         return Composer(self, node).get_xpath(type, instance=instance)
+
+    def get_statement(self, node):
+        '''get_statement
+
+        High-level api: Given a config or schema node, get_statement returns a
+        pyang Statement object.
+
+        Parameters
+        ----------
+
+        node : `Element`
+            A config or schema node.
+
+        Returns
+        -------
+
+        `pyang.statements.Statement`
+            A Statement object of pyang.
+
+
+        Code Example::
+
+            >>> m.get_xpath(schema_node)
+            '/ios:native/bfd/ios-bfd:l2cos'
+            >>> s = m.get_statement(schema_node)
+            >>> s
+            <pyang.LeafLeaflistStatement 'leaf l2cos' at 0x7f46989a1d50>
+            >>> s.pprint()
+            leaf l2cos
+             description Value of L2 COS for BFD Pkts over VLAN interfaces
+             type uint8
+              range 0..6
+            >>>
+        '''
+        if self.compiler is None:
+            return None
+        return self.compiler.context.get_statement(
+            modulename=self.get_model_name(node),
+            xpath=self.get_xpath(node, type=Tag.LXML_XPATH, instance=False),
+        )
 
     def convert_tag(self, default_ns, tag, src=Tag.LXML_ETREE, dst=Tag.YTOOL):
         '''convert_tag
