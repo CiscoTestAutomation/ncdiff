@@ -872,11 +872,11 @@ class ModelCompiler(object):
             return self.context.errors
 
     def _read_from_cache(self, name):
-        cached_name = os.path.join(self.dir_yang, f"{name}.xml")
+        cached_name = os.path.join(self.dir_yang, name + ".xml")
         return read_xml(cached_name)
 
     def _write_to_cache(self, name, element):
-        cached_name = os.path.join(self.dir_yang, f"{name}.xml")
+        cached_name = os.path.join(self.dir_yang, name + ".xml")
         write_xml(cached_name, element)
 
     def build_dependencies(self):
