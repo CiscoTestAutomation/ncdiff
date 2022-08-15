@@ -8,7 +8,7 @@ can be considered as the payload of an edit-config message.
 
 .. toctree::
 
-   README
+   intro
    apidocs
    changelog/index
 
