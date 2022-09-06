@@ -6,9 +6,17 @@ import logging
 
 from lxml import etree
 from copy import deepcopy
-from pyang import repository, context, statements
 from ncclient import operations
 from threading import Thread, current_thread
+from pyang import statements
+try:
+    from pyang.repository import FileRepository
+except ImportError:
+    from pyang import FileRepository
+try:
+    from pyang.context import Context
+except ImportError:
+    from pyang import Context
 
 from .errors import ModelError
 
@@ -506,6 +514,7 @@ class ContextWorker(Thread):
         self.context = context
 
     def run(self):
+        varnames = Context.add_module.__code__.co_varnames
         while not self.context.modulefile_queue.empty():
             try:
                 modulefile = self.context.modulefile_queue.get(timeout=0.01)
@@ -514,23 +523,32 @@ class ContextWorker(Thread):
             else:
                 with open(modulefile, 'r', encoding='utf-8') as f:
                     text = f.read()
-                module_statement = self.context.add_module(
-                    ref=modulefile,
-                    text=text,
-                    primary_module=True,
-                )
+                kwargs = {
+                    'ref': modulefile,
+                    'text': text,
+                }
+                if 'primary_module' in varnames:
+                    kwargs['primary_module'] = True
+                if 'format' in varnames:
+                    kwargs['format'] = 'yang'
+                if 'in_format' in varnames:
+                    kwargs['in_format'] = 'yang'
+                module_statement = self.context.add_module(**kwargs)
                 self.context.update_dependencies(module_statement)
                 self.context.modulefile_queue.task_done()
         logger.debug('Thread {} exits'.format(current_thread().name))
 
 
-class CompilerContext(context.Context):
+class CompilerContext(Context):
 
     def __init__(self, repository):
-        context.Context.__init__(self, repository)
+        Context.__init__(self, repository)
         self.dependencies = None
         self.modulefile_queue = None
-        self.num_threads = 2
+        if 'prune' in dir(statements.Statement):
+            self.num_threads = 2
+        else:
+            self.num_threads = 1
 
     def _get_latest_revision(self, modulename):
         latest = None
@@ -667,8 +685,20 @@ class CompilerContext(context.Context):
             ):
                 revisions[mudule_name] = module_revision
         self.validate()
-        for mudule_name, module_revision in revisions.items():
-            self.modules[(mudule_name, module_revision)].prune()
+        if 'prune' in dir(statements.Statement):
+            for mudule_name, module_revision in revisions.items():
+                self.modules[(mudule_name, module_revision)].prune()
+
+    def internal_reset(self):
+        self.modules = {}
+        self.revs = {}
+        self.errors = []
+        for mod, rev, handle in self.repository.get_modules_and_revisions(
+                self):
+            if mod not in self.revs:
+                self.revs[mod] = []
+            revs = self.revs[mod]
+            revs.append((rev, handle))
 
 
 class ModelDownloader(object):
@@ -800,13 +830,21 @@ class ModelDownloader(object):
                            .format(module))
             return
         if reply.ok:
+            varnames = Context.add_module.__code__.co_varnames
             fname = os.path.join(self.dir_yang, module+'.yang')
             with open(fname, 'wb') as f:
                 f.write(reply.data.encode('utf-8'))
-            module_statement = self.context.add_module(
-                ref=fname,
-                text=reply.data,
-            )
+            kwargs = {
+                'ref': fname,
+                'text': reply.data,
+            }
+            if 'primary_module' in varnames:
+                kwargs['primary_module'] = True
+            if 'format' in varnames:
+                kwargs['format'] = 'yang'
+            if 'in_format' in varnames:
+                kwargs['in_format'] = 'yang'
+            module_statement = self.context.add_module(**kwargs)
             dependencies = self.context.update_dependencies(module_statement)
             s = dependencies - self.to_be_downloaded
             if s:
@@ -893,7 +931,7 @@ class ModelCompiler(object):
         '''
 
         if self.context is None:
-            repo = repository.FileRepository(path=self.dir_yang)
+            repo = FileRepository(path=self.dir_yang)
             self.context = CompilerContext(repository=repo)
         if self.context.dependencies is None:
             self.context.read_dependencies()
@@ -959,6 +997,7 @@ class ModelCompiler(object):
         if cached_tree is not None:
             return Model(cached_tree)
 
+        varnames = Context.add_module.__code__.co_varnames
         imports, depends = self.get_dependencies(module)
         required_module_set = imports | depends
         required_module_set.add(module)
@@ -969,11 +1008,17 @@ class ModelCompiler(object):
             if os.path.isfile(modulefile):
                 with open(modulefile, 'r', encoding='utf-8') as f:
                     text = f.read()
-                self.context.add_module(
-                    ref=modulefile,
-                    text=text,
-                    primary_module=True,
-                )
+                kwargs = {
+                    'ref': modulefile,
+                    'text': text,
+                }
+                if 'primary_module' in varnames:
+                    kwargs['primary_module'] = True
+                if 'format' in varnames:
+                    kwargs['format'] = 'yang'
+                if 'in_format' in varnames:
+                    kwargs['in_format'] = 'yang'
+                self.context.add_module(**kwargs)
         self.context.validate_context()
         vm = self.context.get_module(module)
         st = etree.Element(vm.arg)
