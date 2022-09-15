@@ -735,7 +735,7 @@ class ModelDownloader(object):
             self.dir_yang,
             'capabilities.txt',
         )
-        repo = repository.FileRepository(path=self.dir_yang)
+        repo = FileRepository(path=self.dir_yang)
         self.context = CompilerContext(repository=repo)
         self.download_queue = queue.Queue()
         self.num_threads = 2
