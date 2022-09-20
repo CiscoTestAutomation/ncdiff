@@ -112,11 +112,7 @@ class RunningConfigDiff(object):
         self.running2 = running2
 
     def __bool__(self):
-        diff1, diff2 = self.diff
-        if diff1 or diff2:
-            return True
-        else:
-            return False
+        return bool(self.diff)
 
     def __str__(self):
         return self.dict2config(self.diff, diff_type=' ')
