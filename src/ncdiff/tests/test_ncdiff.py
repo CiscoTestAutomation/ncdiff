@@ -7,6 +7,7 @@ from lxml import etree
 from ncdiff.manager import ModelDevice
 from ncdiff.config import Config, ConfigDelta
 from ncdiff.errors import ConfigDeltaError
+from ncdiff.composer import Tag
 
 from ncclient import operations, xml_
 from ncclient.manager import Manager
@@ -2522,9 +2523,13 @@ class TestNcDiff(unittest.TestCase):
         schema_node = self.d.get_schema_node(config_node)
         assert schema_node is not None
 
-#     def test_get_prefix_1(self):
-#         prefix = self.d.get_prefix('urn:ietf:params:xml:ns:yang:iana-if-type')
-#         self.assertEqual(prefix, 'ianaift')
+    def test_convert_ns_1(self):
+        prefix = self.d.convert_ns(
+          'urn:ietf:params:xml:ns:yang:iana-if-type',
+          src=Tag.NAMESPACE,
+          dst=Tag.PREFIX,
+        )
+        self.assertEqual(prefix, 'ianaift')
 
     def test_get_config_1(self):
         expected_ns = {
