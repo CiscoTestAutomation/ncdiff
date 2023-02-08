@@ -138,6 +138,7 @@ class RunningConfigDiff(object):
 
         self.running1 = running1
         self.running2 = running2
+        self._diff_list = None
 
     def __bool__(self):
         return bool(self.diff)
@@ -155,11 +156,28 @@ class RunningConfigDiff(object):
     def diff(self):
         list1 = self.running2list(self.running1)
         list2 = self.running2list(self.running2)
-        diff_list = ListDiff(list1, list2).diff
-        if diff_list:
-            return diff_list
+        self._diff_list = ListDiff(list1, list2).diff
+        return self._diff_list if self._diff_list else None
+
+    @property
+    def cli(self):
+        return self.get_cli(reverse=False)
+
+    @property
+    def cli_reverse(self):
+        return self.get_cli(reverse=True)
+
+    def get_cli(self, reverse=False):
+        if self._diff_list is None:
+            self.diff
+        positive_str, negative_str = self.list2cli(self._diff_list, reverse=reverse)
+        if positive_str:
+            if negative_str:
+                return negative_str + '\n' + positive_str
+            else:
+                return positive_str
         else:
-            return None
+            return negative_str
 
     def running2list(self, str_in):
         str_in = str_in.replace('exit-address-family', ' exit-address-family')
@@ -237,6 +255,50 @@ class RunningConfigDiff(object):
                     self.list2config(v, diff_type=local_diff_type),
                 )
         return str_ret
+
+    def list2cli(self, list_in, reverse=False):
+        if reverse:
+            plus = '-'
+            minus = '+'
+        else:
+            plus = '+'
+            minus = '-'
+        positive_list = []
+        negative_list = []
+        positive_keys = [k for k, v, i in list_in if i == plus and v is None]
+        if list_in is None:
+            return ''
+        for k, v, i in list_in:
+            if k == '':
+                continue
+            if v is None:
+                if i == plus:
+                    positive_list.append(k)
+                elif i == minus:
+                    # In a case that a CLI is updated, no command is not needed:
+                    # - service timestamps debug datetime msec
+                    # + service timestamps debug datetime msec localtime show-timezone
+                    key_len = len(k)
+                    matching_positive_keys = [
+                        key for key in positive_keys if key[:key_len] == k]
+                    if not matching_positive_keys:
+                        negative_list.append('no ' + k)
+            else:
+                if i == '':
+                    positive_str, negative_str = self.list2cli(v, reverse=reverse)
+                    if positive_str:
+                        positive_list.append(k + '\n' + self.indent(positive_str).rstrip())
+                    if negative_str:
+                        negative_list.append(k + '\n' + self.indent(negative_str).rstrip())
+                if i == plus:
+                    positive_str = self.list2config(v, diff_type=None).rstrip()
+                    if positive_str:
+                        positive_list.append(k + '\n' + positive_str)
+                    else:
+                        positive_list.append(k)
+                elif i == minus:
+                    negative_list.append('no ' + k)
+        return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
 
     def indent(self, str_in):
         str_ret = ''
