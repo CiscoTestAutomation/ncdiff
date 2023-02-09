@@ -978,7 +978,7 @@ class ModelCompiler(object):
     def compile(self, module):
         '''compile
 
-        High-level api: Compile a module.
+        High-level api: Compile a module. The module cannot be a submodule.
 
         Parameters
         ----------
@@ -1022,9 +1022,15 @@ class ModelCompiler(object):
         self.context.validate_context()
         vm = self.context.get_module(module)
         st = etree.Element(vm.arg)
-        st.set('type', 'module')
+        st.set('type', vm.keyword)
         statement = vm.search_one('prefix')
-        if statement is not None:
+        if statement is None:
+            raise ValueError("Module '{}' is a {} which belongs to '{}'. "
+                             "Please compile '{}' instead."
+                             .format(module, vm.keyword,
+                                     vm.i_including_modulename,
+                                     vm.i_including_modulename))
+        else:
             st.set('prefix', statement.arg)
 
         for m_statement in self.context.modules.values():
