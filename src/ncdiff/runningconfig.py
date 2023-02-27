@@ -4,6 +4,15 @@ import logging
 # create a logger for this module
 logger = logging.getLogger(__name__)
 
+# Some no commands are not forgiving, e.g., "no license boot level
+# network-advantage addon dna-advantage" is rejected, but "no license boot
+# level" is acceptable. These cases are listed in SHORT_NO_COMMANDS.
+SHORT_NO_COMMANDS = [
+    'no license boot level ',
+    'no transport input ',
+    'no transport output ',
+]
+
 
 class ListDiff(object):
     '''ListDiff
@@ -170,7 +179,8 @@ class RunningConfigDiff(object):
     def get_cli(self, reverse=False):
         if self._diff_list is None:
             self.diff
-        positive_str, negative_str = self.list2cli(self._diff_list, reverse=reverse)
+        positive_str, negative_str = self.list2cli(
+            self._diff_list, reverse=reverse)
         if positive_str:
             if negative_str:
                 return negative_str + '\n' + positive_str
@@ -275,21 +285,27 @@ class RunningConfigDiff(object):
                 if i == plus:
                     positive_list.append(k)
                 elif i == minus:
-                    # In a case that a CLI is updated, no command is not needed:
+                    # In a case that a CLI is updated, no command is not
+                    # needed:
                     # - service timestamps debug datetime msec
-                    # + service timestamps debug datetime msec localtime show-timezone
+                    # + service timestamps debug datetime msec localtime
+                    #   show-timezone
                     key_len = len(k)
                     matching_positive_keys = [
                         key for key in positive_keys if key[:key_len] == k]
                     if not matching_positive_keys:
-                        negative_list.append('no ' + k)
+                        negative_list.append(
+                            self.handle_no_commands('no ' + k))
             else:
                 if i == '':
-                    positive_str, negative_str = self.list2cli(v, reverse=reverse)
+                    positive_str, negative_str = self.list2cli(
+                        v, reverse=reverse)
                     if positive_str:
-                        positive_list.append(k + '\n' + self.indent(positive_str).rstrip())
+                        positive_list.append(
+                            k + '\n' + self.indent(positive_str).rstrip())
                     if negative_str:
-                        negative_list.append(k + '\n' + self.indent(negative_str).rstrip())
+                        negative_list.append(
+                            k + '\n' + self.indent(negative_str).rstrip())
                 if i == plus:
                     positive_str = self.list2config(v, diff_type=None).rstrip()
                     if positive_str:
@@ -297,8 +313,18 @@ class RunningConfigDiff(object):
                     else:
                         positive_list.append(k)
                 elif i == minus:
-                    negative_list.append('no ' + k)
+                    negative_list.append(
+                        self.handle_no_commands('no ' + k))
         return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
+
+    @staticmethod
+    def handle_no_commands(cmd):
+        if cmd[:6] == 'no no ':
+            return cmd[6:]
+        for short_cmd in SHORT_NO_COMMANDS:
+            if cmd[:len(short_cmd)] == short_cmd:
+                return short_cmd
+        return cmd
 
     def indent(self, str_in):
         str_ret = ''
