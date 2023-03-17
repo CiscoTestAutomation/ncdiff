@@ -13,6 +13,48 @@ SHORT_NO_COMMANDS = [
     'no transport output ',
 ]
 
+# Some commands are orderless, e.g., "show running-config" output could be:
+# aaa authentication login admin-con group tacacs+ local
+# aaa authentication login admin-vty group tacacs+ local
+# Or in other times it is displayed in a different order:
+# aaa authentication login admin-vty group tacacs+ local
+# aaa authentication login admin-con group tacacs+ local
+ORDERLESS_COMMANDS = [
+    r'^ *aaa authentication login ',
+]
+
+# Some commands can be overwritten without a no command. For example, changing
+# from:
+# username admin privilege 15 password 0 admin
+# to:
+# username admin privilege 15 password 7 15130F010D24
+# There is no need to send a no command before sending the second line.
+OVERWRITABLE_COMMANDS = [
+    r'^ *username \S+ privilege [0-9]+ password ',
+    r'^ *password ',
+    r'^ *description ',
+]
+
+# Some commands their positive and negative lines are both appeared in the
+# "show running-config" output, e.g., "platform punt-keepalive
+# disable-kernel-core" and "no platform punt-keepalive disable-kernel-core"
+# are both visible. Special treatment is required to avoid two lines of the
+# same CLI.
+DOUBLE_FACE_COMMANDS = [
+    r'^ *(no)? *platform punt-keepalive disable-kernel-core',
+]
+
+# Some commands look like a parent-child relation but actually they are
+# siblings. One example is two lines of client config below:
+# aaa server radius proxy
+#  client 10.0.0.0 255.0.0.0
+#   !
+#   client 11.0.0.0 255.0.0.0
+#   !
+SIBLING_CAMMANDS = [
+    r'^ *client ',
+]
+
 
 class ListDiff(object):
     '''ListDiff
@@ -183,7 +225,7 @@ class RunningConfigDiff(object):
             self._diff_list, reverse=reverse)
         if positive_str:
             if negative_str:
-                return negative_str + '\n' + positive_str
+                return negative_str + '\n!\n' + positive_str
             else:
                 return positive_str
         else:
@@ -191,7 +233,7 @@ class RunningConfigDiff(object):
 
     def running2list(self, str_in):
         str_in = str_in.replace('exit-address-family', ' exit-address-family')
-        return self.config2list(str_in)
+        return self.config2list(self.handle_orderless(str_in))
 
     def config2list(self, str_in):
         list_ret = []
@@ -207,7 +249,7 @@ class RunningConfigDiff(object):
                 continue
             if len(line.strip()) == 0:
                 continue
-            if re.search('^ *!', line):
+            if re.search('^ *!', line) or re.search('^ *%', line):
                 continue
             if line[0] == ' ':
                 current_indentation = len(re.search('^ *', line).group(0))
@@ -267,23 +309,23 @@ class RunningConfigDiff(object):
         return str_ret
 
     def list2cli(self, list_in, reverse=False):
-        if reverse:
-            plus = '-'
-            minus = '+'
-        else:
-            plus = '+'
-            minus = '-'
+        if list_in is None:
+            return ''
+        plus = '-' if reverse else '+'
+        minus = '+' if reverse else '-'
         positive_list = []
         negative_list = []
         positive_keys = [k for k, v, i in list_in if i == plus and v is None]
-        if list_in is None:
-            return ''
         for k, v, i in list_in:
             if k == '':
                 continue
             if v is None:
                 if i == plus:
-                    positive_list.append(k)
+                    cmd, is_no_cmd = self.handle_commands(k)
+                    if is_no_cmd:
+                        negative_list.append(cmd)
+                    else:
+                        positive_list.append(cmd)
                 elif i == minus:
                     # In a case that a CLI is updated, no command is not
                     # needed:
@@ -294,8 +336,11 @@ class RunningConfigDiff(object):
                     matching_positive_keys = [
                         key for key in positive_keys if key[:key_len] == k]
                     if not matching_positive_keys:
-                        negative_list.append(
-                            self.handle_no_commands('no ' + k))
+                        cmd, is_no_cmd = self.handle_commands('no ' + k)
+                        if is_no_cmd:
+                            negative_list.append(cmd)
+                        else:
+                            positive_list.append(cmd)
             else:
                 if i == '':
                     positive_str, negative_str = self.list2cli(
@@ -313,18 +358,72 @@ class RunningConfigDiff(object):
                     else:
                         positive_list.append(k)
                 elif i == minus:
-                    negative_list.append(
-                        self.handle_no_commands('no ' + k))
+                    cmd, is_no_cmd = self.handle_commands('no ' + k)
+                    if is_no_cmd:
+                        negative_list.append(cmd)
+                    else:
+                        positive_list.append(cmd)
+
+        # Handle overwritable commands
+        for regx in OVERWRITABLE_COMMANDS:
+            for cmd in positive_list:
+                m = re.search(regx, cmd)
+                if m:
+                    exact_cmd = 'no ' + m.group(0).lstrip()
+                    len_exact_cmd = len(exact_cmd)
+                    for idx, line in enumerate(negative_list):
+                        cmd_line = line.lstrip()
+                        if (
+                            len(cmd_line) >= len_exact_cmd and
+                            cmd_line[:len_exact_cmd] == exact_cmd
+                        ):
+                            break
+                    else:
+                        continue
+                    del negative_list[idx]
+
+        # Handle double face commands
+        for regx in DOUBLE_FACE_COMMANDS:
+            for cmd_list in [positive_list, negative_list]:
+                indexes = []
+                for idx, line in enumerate(cmd_list):
+                    if re.search(regx, line):
+                        indexes.append(idx)
+                if len(indexes) > 1:
+                    for idx in reversed(indexes[1:]):
+                        del cmd_list[idx]
+
         return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
 
     @staticmethod
-    def handle_no_commands(cmd):
+    def handle_commands(cmd):
         if cmd[:6] == 'no no ':
-            return cmd[6:]
+            return cmd[6:], False
         for short_cmd in SHORT_NO_COMMANDS:
             if cmd[:len(short_cmd)] == short_cmd:
-                return short_cmd
-        return cmd
+                return short_cmd, True
+        if cmd[:3] == 'no ':
+            return cmd, True
+        else:
+            return cmd, False
+
+    @staticmethod
+    def handle_orderless(running):
+        lines = running.splitlines()
+        for regx in ORDERLESS_COMMANDS:
+            indexes = []
+            for idx, line in enumerate(lines):
+                if re.search(regx, line):
+                    indexes.append(idx)
+            if len(indexes) < 2:
+                continue
+            matches_dict = {hash(lines[i]): lines[i] for i in indexes}
+            matches_list = [
+                matches_dict[i] for i in sorted(list(matches_dict.keys()))]
+            for i in reversed(indexes):
+                del lines[i]
+            lines = lines[:indexes[0]] + matches_list + lines[indexes[0]:]
+        return '\n'.join(lines)
 
     def indent(self, str_in):
         str_ret = ''

@@ -251,3 +251,131 @@ vrf definition generic
         self.assertEqual(len(actual_lines), len(expected_lines))
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line, expected_line)
+
+    def test_cli_short_no_commands(self):
+        config_1 = """
+vrf definition genericstring
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+license boot level network-advantage addon dna-advantage
+        """
+        config_2 = """
+vrf definition generic
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+        """
+        expected_cli = """
+no license boot level
+no vrf definition genericstring
+!
+vrf definition generic
+  address-family ipv4
+    exit-address-family
+  address-family ipv6
+    exit-address-family
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_orderless_commands(self):
+        config_1 = """
+license boot level network-advantage addon dna-advantage
+!
+aaa authentication login admin-con group tacacs+ local
+aaa authentication login admin-vty group tacacs+ local
+        """
+        config_2 = """
+aaa authentication login admin-vty group tacacs+ local
+aaa authentication login admin-con group tacacs+ local
+        """
+        expected_cli = """
+no license boot level
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_overwritable_commands(self):
+        config_1 = """
+line vty 0 4
+ exec-timeout 0 0
+ password 0 lab
+ transport input all
+!
+        """
+        config_2 = """
+line vty 0 4
+ exec-timeout 0 0
+ password 7 082D4D4C
+ transport input all
+!
+        """
+        expected_cli = """
+line vty 0 4
+ password 7 082D4D4C
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_doubleface_commands(self):
+        config_1 = """
+no platform punt-keepalive disable-kernel-core
+!
+        """
+        config_2 = """
+platform punt-keepalive disable-kernel-core
+        """
+        expected_cli = """
+platform punt-keepalive disable-kernel-core
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
