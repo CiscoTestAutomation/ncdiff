@@ -379,3 +379,73 @@ platform punt-keepalive disable-kernel-core
         self.assertEqual(len(actual_lines), len(expected_lines))
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_sibling_commands(self):
+        config_1 = """
+aaa server radius proxy
+ client 10.0.0.0 255.0.0.0
+  timer disconnect acct-stop 23
+  !
+  client 11.0.0.0 255.0.0.0
+  accounting port 34
+  !
+  client 12.0.0.0 255.0.0.0
+  accounting port 56
+  !
+abc def
+  aaa server radius proxy
+    client 10.0.0.0 255.0.0.0
+      ert tyt
+      client 11.0.0.0 255.0.0.0
+        kdjfg kjkfdg
+      client 12.0.0.0 255.0.0.0
+        gdfh lijdf
+        """
+        config_2 = """
+aaa server radius proxy
+ client 11.0.0.0 255.0.0.0
+  accounting port 34
+  !
+  client 13.0.0.0 255.0.0.0
+  accounting port 77
+  !
+abc def
+  aaa server radius proxy
+    client 11.0.0.0 255.0.0.0
+      kdjfg ttttt
+      client 13.0.0.0 255.0.0.0
+        gdfh lijdf
+        """
+        expected_cli = """
+abc def
+  aaa server radius proxy
+    no client 12.0.0.0 255.0.0.0
+    client 11.0.0.0 255.0.0.0
+      no kdjfg kjkfdg
+    no client 10.0.0.0 255.0.0.0
+aaa server radius proxy
+  no client 12.0.0.0 255.0.0.0
+  no client 10.0.0.0 255.0.0.0
+!
+aaa server radius proxy
+  client 13.0.0.0 255.0.0.0
+    accounting port 77
+abc def
+  aaa server radius proxy
+    client 11.0.0.0 255.0.0.0
+      kdjfg ttttt
+    client 13.0.0.0 255.0.0.0
+      gdfh lijdf
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())

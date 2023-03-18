@@ -1,6 +1,7 @@
 import re
 import logging
 
+
 # create a logger for this module
 logger = logging.getLogger(__name__)
 
@@ -35,15 +36,6 @@ OVERWRITABLE_COMMANDS = [
     r'^ *description ',
 ]
 
-# Some commands their positive and negative lines are both appeared in the
-# "show running-config" output, e.g., "platform punt-keepalive
-# disable-kernel-core" and "no platform punt-keepalive disable-kernel-core"
-# are both visible. Special treatment is required to avoid two lines of the
-# same CLI.
-DOUBLE_FACE_COMMANDS = [
-    r'^ *(no)? *platform punt-keepalive disable-kernel-core',
-]
-
 # Some commands look like a parent-child relation but actually they are
 # siblings. One example is two lines of client config below:
 # aaa server radius proxy
@@ -52,6 +44,26 @@ DOUBLE_FACE_COMMANDS = [
 #   client 11.0.0.0 255.0.0.0
 #   !
 SIBLING_CAMMANDS = [
+    r'^ *client ',
+]
+
+# As for the client command above, its children does not have indentation:
+# aaa server radius proxy
+#  client 10.0.0.0 255.0.0.0
+#   timer disconnect acct-stop 23
+#   !
+#   client 11.0.0.0 255.0.0.0
+#   accounting port 34
+#   timer disconnect acct-stop 22
+#   !
+#   client 12.0.0.0 255.0.0.0
+#   accounting port 56
+#   !
+# Logically, "accounting port 34" and "timer disconnect acct-stop 22" are
+# children of "client 11.0.0.0 255.0.0.0", but there is no indentation in the
+# "show running-config" output. The sub-section is indicated by the expression
+# mark.
+MISSING_INDENT_COMMANDS = [
     r'^ *client ',
 ]
 
@@ -207,6 +219,8 @@ class RunningConfigDiff(object):
     def diff(self):
         list1 = self.running2list(self.running1)
         list2 = self.running2list(self.running2)
+        self.handle_sibling_cammands(list1)
+        self.handle_sibling_cammands(list2)
         self._diff_list = ListDiff(list1, list2).diff
         return self._diff_list if self._diff_list else None
 
@@ -240,6 +254,7 @@ class RunningConfigDiff(object):
         last_line = ''
         last_section = ''
         last_indentation = 0
+        missing_indent = False
         for line in str_in.splitlines():
             if len(line.strip()) > 22 and \
                line[:22] == 'Building configuration':
@@ -248,6 +263,18 @@ class RunningConfigDiff(object):
                line[:21] == 'Current configuration':
                 continue
             if len(line.strip()) == 0:
+                continue
+            if missing_indent and line.rstrip() == '!':
+                if last_line:
+                    if last_indentation > 0:
+                        list_ret.append((
+                            last_line, self.config2list(last_section), ''))
+                    else:
+                        list_ret.append((last_line, None, ''))
+                last_line = ''
+                last_section = ''
+                last_indentation = 0
+                missing_indent = False
                 continue
             if re.search('^ *!', line) or re.search('^ *%', line):
                 continue
@@ -271,6 +298,16 @@ class RunningConfigDiff(object):
                 else:
                     last_section += line[last_indentation:] + '\n'
             else:
+                if any(
+                    [re.search(regx, line) for regx in MISSING_INDENT_COMMANDS]
+                ):
+                    missing_indent = True
+                elif missing_indent:
+                    current_indentation = 1
+                    if last_indentation == 0:
+                        last_indentation = current_indentation
+                    last_section += line + '\n'
+                    continue
                 if last_line:
                     if last_indentation > 0:
                         list_ret.append((
@@ -280,10 +317,12 @@ class RunningConfigDiff(object):
                 last_line = line
                 last_section = ''
                 last_indentation = 0
-        if last_indentation > 0:
-            list_ret.append((last_line, self.config2list(last_section), ''))
-        else:
-            list_ret.append((last_line, None, ''))
+        if last_line:
+            if last_indentation > 0:
+                list_ret.append((
+                    last_line, self.config2list(last_section), ''))
+            else:
+                list_ret.append((last_line, None, ''))
         return list_ret
 
     def list2config(self, list_in, diff_type=None):
@@ -382,16 +421,14 @@ class RunningConfigDiff(object):
                         continue
                     del negative_list[idx]
 
-        # Handle double face commands
-        for regx in DOUBLE_FACE_COMMANDS:
-            for cmd_list in [positive_list, negative_list]:
-                indexes = []
-                for idx, line in enumerate(cmd_list):
-                    if re.search(regx, line):
-                        indexes.append(idx)
-                if len(indexes) > 1:
-                    for idx in reversed(indexes[1:]):
-                        del cmd_list[idx]
+        # Handle duplicate commands
+        # Some commands their positive and negative lines are both appeared in
+        # the "show running-config" output, e.g., "platform punt-keepalive
+        # disable-kernel-core" and "no platform punt-keepalive
+        # disable-kernel-core" are both visible. This treatment is required to
+        # avoid two lines of the same CLI.
+        for cmd_list in [positive_list, negative_list]:
+            self.remove_duplicate_cammands(cmd_list)
 
         return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
 
@@ -424,6 +461,46 @@ class RunningConfigDiff(object):
                 del lines[i]
             lines = lines[:indexes[0]] + matches_list + lines[indexes[0]:]
         return '\n'.join(lines)
+
+    @staticmethod
+    def remove_duplicate_cammands(config_list):
+        indexes = []
+        commands = set()
+        for idx, line in enumerate(config_list):
+            if line in commands:
+                indexes.append(idx)
+            else:
+                commands.add(line)
+        if indexes:
+            for idx in reversed(indexes):
+                del config_list[idx]
+
+    @staticmethod
+    def handle_sibling_cammands(config_list):
+        length = len(config_list)
+        lines_inserted = 0
+        for i in range(length):
+            idx = i + lines_inserted
+            tup = config_list[idx]
+            for regx in SIBLING_CAMMANDS:
+                if re.search(regx, tup[0]) and tup[1] is not None:
+                    siblings = []
+                    indexes = []
+                    for idx_c, tup_c in enumerate(tup[1]):
+                        if re.search(regx, tup_c[0]):
+                            indexes.append(idx_c)
+                    for idx_c in reversed(indexes):
+                        siblings.append(tup[1][idx_c])
+                        del tup[1][idx_c]
+                    if not tup[1]:
+                        tup = config_list[idx] = (tup[0], None, tup[2])
+                    j = 1
+                    for sibling in reversed(siblings):
+                        config_list.insert(i+j, sibling)
+                        j += 1
+                    break
+            if tup[1] is not None:
+                RunningConfigDiff.handle_sibling_cammands(tup[1])
 
     def indent(self, str_in):
         str_ret = ''
