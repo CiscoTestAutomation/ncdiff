@@ -181,6 +181,131 @@ class NetconfCalculator(BaseCalculator):
         self.node_sub(ele1, ele2)
         return ele1
 
+    def get_config_replace(self):
+        '''get_config_replace
+
+        High-level api: Build an edit-config using operation='replace'. It
+        will be mostly from self.etree1.
+
+        Parameters
+        ----------
+
+        None
+
+        Returns
+        -------
+
+        Element
+            An element represnting an edit-config.
+        '''
+
+        ele = deepcopy(self.etree1)
+        in_s_not_in_o, in_o_not_in_s, in_s_and_in_o = \
+            self._group_kids(ele, self.etree2)
+        ordered_by_user = {}
+
+        for child_self in in_s_not_in_o:
+            child_self.set(operation_tag, 'replace')
+            s_node = self.device.get_schema_node(child_self)
+            if s_node.get('type') == 'leaf-list':
+                if (
+                    s_node.get('ordered-by') == 'user' and
+                    s_node.tag not in ordered_by_user
+                ):
+                    ordered_by_user[s_node.tag] = 'leaf-list'
+            elif s_node.get('type') == 'list':
+                keys = self._get_list_keys(s_node)
+                if (
+                    s_node.get('ordered-by') == 'user' and
+                    s_node.tag not in ordered_by_user
+                ):
+                    ordered_by_user[s_node.tag] = keys
+
+        for child_other in in_o_not_in_s:
+            child_self = etree.Element(child_other.tag,
+                                       {operation_tag: 'remove'},
+                                       nsmap=child_other.nsmap)
+            siblings = list(ele.iterchildren(tag=child_other.tag))
+            if siblings:
+                siblings[-1].addnext(child_self)
+            else:
+                ele.append(child_self)
+            s_node = self.device.get_schema_node(child_other)
+            if s_node.get('type') == 'leaf-list':
+                self._merge_text(child_other, child_self)
+            elif s_node.get('type') == 'list':
+                keys = self._get_list_keys(s_node)
+                for key in keys:
+                    key_node = child_other.find(key)
+                    e = etree.SubElement(
+                        child_self, key, nsmap=key_node.nsmap)
+                    e.text = key_node.text
+
+        for child_self, child_other in in_s_and_in_o:
+            child_self.set(operation_tag, 'replace')
+            s_node = self.device.get_schema_node(child_self)
+            if s_node.get('type') == 'leaf':
+                if self._same_text(child_self, child_other):
+                    ele.remove(child_self)
+            elif s_node.get('type') == 'leaf-list':
+                if s_node.get('ordered-by') == 'user':
+                    if s_node.tag not in ordered_by_user:
+                        ordered_by_user[s_node.tag] = 'leaf-list'
+                else:
+                    ele.remove(child_self)
+            elif s_node.get('type') == 'container':
+                if (
+                    self._node_le(child_self, child_other) and
+                    self._node_le(child_other, child_self)
+                ):
+                    ele.remove(child_self)
+            elif s_node.get('type') == 'list':
+                if (
+                    s_node.get('ordered-by') == 'user' and
+                    s_node.tag not in ordered_by_user
+                ):
+                    ordered_by_user[s_node.tag] = self._get_list_keys(s_node)
+                if (
+                    self._node_le(child_self, child_other) and
+                    self._node_le(child_other, child_self)
+                ):
+                    if s_node.get('ordered-by') != 'user':
+                        ele.remove(child_self)
+            else:
+                path = self.device.get_xpath(s_node)
+                raise ModelError("unknown schema node type: type of node {}"
+                                 "is '{}'".format(path, s_node.get('type')))
+
+        for tag in ordered_by_user:
+            scope_o = in_s_not_in_o + in_s_and_in_o
+            sequence = self._get_sequence(scope_o, tag, ele)
+            for i, item in enumerate(sequence):
+                # modifying the namespace mapping of a node is not possible
+                # in lxml. See https://bugs.launchpad.net/lxml/+bug/555602
+                # if 'yang' not in item.nsmap:
+                #     item.nsmap['yang'] = yang_url
+                if i == 0:
+                    item.set(insert_tag, 'first')
+                else:
+                    item.set(insert_tag, 'after')
+                    precursor = sequence[i - 1]
+                    if ordered_by_user[tag] == 'leaf-list':
+                        item.set(value_tag, precursor.text)
+                    else:
+                        keys = ordered_by_user[tag]
+                        key_nodes = {k: precursor.find(k) for k in keys}
+                        ids = {
+                            k: self._url_to_prefix(n, k)
+                            for k, n in key_nodes.items()
+                        }
+                        id_list = [
+                            "[{}='{}']".format(ids[k], key_nodes[k].text)
+                            for k in keys
+                        ]
+                        item.set(key_tag, ''.join(id_list))
+
+        return ele
+
     def node_add(self, node_sum, node_other):
         '''node_add
 
@@ -780,23 +905,6 @@ class NetconfCalculator(BaseCalculator):
             There is no return of this method.
         '''
 
-        def same_leaf_list(tag):
-            list_self = [c for c in list(node_self) if c.tag == tag]
-            list_other = [c for c in list(node_other) if c.tag == tag]
-            s_node = self.device.get_schema_node((list_self + list_other)[0])
-            if s_node.get('ordered-by') == 'user':
-                if [self._parse_text(i, s_node) for i in list_self] == \
-                   [self._parse_text(i, s_node) for i in list_other]:
-                    return True
-                else:
-                    return False
-            else:
-                if set([self._parse_text(i, s_node) for i in list_self]) == \
-                   set([self._parse_text(i, s_node) for i in list_other]):
-                    return True
-                else:
-                    return False
-
         if self.preferred_replace != 'merge':
             t_self = [
                 c.tag for c in list(node_self)
@@ -808,7 +916,9 @@ class NetconfCalculator(BaseCalculator):
             ]
             commonalities = set(t_self) & set(t_other)
             for commonality in commonalities:
-                if not same_leaf_list(commonality):
+                if not self._same_leaf_list(commonality,
+                                            node_self,
+                                            node_other):
                     node_self.set(operation_tag, 'replace')
                     node_other.set(operation_tag, 'replace')
                     return
@@ -963,7 +1073,7 @@ class NetconfCalculator(BaseCalculator):
         Parameters
         ----------
 
-        node : `str`
+        node : `Element`
             A config node. Its identifier will be converted.
 
         id : `str`
@@ -985,3 +1095,50 @@ class NetconfCalculator(BaseCalculator):
                 else:
                     return prefixes[ret.group(1)] + ':' + ret.group(2)
         return id
+
+    def _same_leaf_list(self, leaf_list_tag, parent_node_1, parent_node_2):
+        '''_same_leaf_list
+
+        Low-level api: Return True when two leaf-list's that are identified by
+        leaf_list_tag are same.
+
+        Parameters
+        ----------
+
+        leaf_list_tag : `str`
+            A config node. Its identifier will be converted.
+
+        parent_node_1 : `Element`
+            One parent node. One or multiple leaf-list nodes are its children.
+
+        parent_node_2 : `Element`
+            The other parent node. One or multiple leaf-list nodes are its
+            children.
+
+        Returns
+        -------
+
+        bool
+            True when the leaf-list nodes under two parent nodes are same.
+            Otherwise False.
+        '''
+
+        list_1 = [c for c in list(parent_node_1) if c.tag == leaf_list_tag]
+        list_2 = [c for c in list(parent_node_2) if c.tag == leaf_list_tag]
+        s_node = self.device.get_schema_node((list_1 + list_2)[0])
+        if s_node.get('ordered-by') == 'user':
+            if (
+                [self._parse_text(i, s_node) for i in list_1] ==
+                [self._parse_text(i, s_node) for i in list_2]
+            ):
+                return True
+            else:
+                return False
+        else:
+            if (
+                set([self._parse_text(i, s_node) for i in list_1]) ==
+                set([self._parse_text(i, s_node) for i in list_2])
+            ):
+                return True
+            else:
+                return False

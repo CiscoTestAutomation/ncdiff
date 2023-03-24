@@ -980,6 +980,12 @@ class TestNcDiff(unittest.TestCase):
         config4 = config2 + delta2
         self.assertEqual(config1, config4)
 
+        # diff_type is 'replace'
+        delta3 = -delta2
+        delta3.diff_type = 'replace'
+        config5 = config1 + delta3
+        self.assertEqual(config2, config5)
+
     def test_xpath_1(self):
         xml = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"

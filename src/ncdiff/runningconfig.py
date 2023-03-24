@@ -192,6 +192,12 @@ class RunningConfigDiff(object):
 
     diff : `list`
         A list from class ListDiff attribute diff.
+
+    cli : `str`
+        CLIs that transits from running1 to running2.
+
+    cli_reverse : `str`
+        CLIs that transits from running2 to running1.
     '''
 
     def __init__(self, running1, running2):

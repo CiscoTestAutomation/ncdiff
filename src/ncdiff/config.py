@@ -1,5 +1,4 @@
 import re
-import time
 import pprint
 import logging
 from lxml import etree
@@ -23,6 +22,7 @@ operation_tag = '{' + nc_url + '}operation'
 key_tag = '{' + yang_url + '}key'
 value_tag = '{' + yang_url + '}value'
 insert_tag = '{' + yang_url + '}insert'
+
 
 def _cmperror(x, y):
     raise TypeError("can't compare '%s' to '%s'" % (
@@ -67,25 +67,29 @@ class Config(object):
         self.parser = None
         if config is None:
             self.ele = etree.Element(config_tag, nsmap={'nc': nc_url})
-        elif isinstance(config, operations.rpc.RPCReply) or \
-             isinstance(config, str) or \
-             etree.iselement(config):
+        elif (
+            isinstance(config, operations.rpc.RPCReply) or
+            isinstance(config, str) or
+            etree.iselement(config)
+        ):
             self.parser = NetconfParser(self.device, config)
             self.ele = self.parser.ele
         elif isinstance(config, Config):
             self.ele = config.ele
         else:
-            raise TypeError("argument 'config' must be None, XML string, " \
-                            "or Element, but not '{}'" \
+            raise TypeError("argument 'config' must be None, XML string, "
+                            "or Element, but not '{}'"
                             .format(type(config)))
         if validate:
             self.validate_config()
 
     def __repr__(self):
-        return '<{}.{} {} at {}>'.format(self.__class__.__module__,
-                                             self.__class__.__name__,
-                                             self.ele.tag,
-                                             hex(id(self)))
+        return '<{}.{} {} at {}>'.format(
+            self.__class__.__module__,
+            self.__class__.__name__,
+            self.ele.tag,
+            hex(id(self)),
+            )
 
     def __str__(self):
         return etree.tostring(self.ele,
@@ -102,23 +106,22 @@ class Config(object):
     def __add__(self, other):
         if isinstance(other, Config):
             if ConfigCompatibility(self, other).is_compatible:
-                return Config(self.device,
-                              NetconfCalculator(self.device,
-                                                self.ele, other.ele).add, False)
+                return Config(
+                    self.device,
+                    NetconfCalculator(self.device, self.ele, other.ele).add,
+                    False,
+                )
         elif isinstance(other, ConfigDelta):
             if ConfigCompatibility(self, other).is_compatible:
                 return Config(self.device,
                               NetconfCalculator(self.device,
                                                 self.ele, other.nc).add, False)
         elif etree.iselement(other):
-            return Config(self.device,
-                          NetconfCalculator(self.device, self.ele, other).add, False)
-        elif isinstance(other, Request):
-            return Config(self.device,
-                          RestconfCalculator(self.device, self.ele, other).add, False)
-        elif isinstance(other, SetRequest):
-            return Config(self.device,
-                          gNMICalculator(self.device, self.ele, other).add, False)
+            return Config(
+                self.device,
+                NetconfCalculator(self.device, self.ele, other).add,
+                False,
+            )
         else:
             return NotImplemented
 
@@ -189,18 +192,18 @@ class Config(object):
             else:
                 ret = re.search('^{(.+)}(.+)$', child.tag)
                 if not ret:
-                    raise ConfigError("unknown root including URL '{}'" \
+                    raise ConfigError("unknown root including URL '{}'"
                                       .format(child.tag))
                 url_to_name = {i[2]: i[0] for i in self.device.namespaces
                                if i[1] is not None}
                 if ret.group(1) in url_to_name:
-                    raise ModelMissing("please load model '{0}' by calling " \
-                                       "method load_model('{0}') of device " \
-                                       "{1}" \
+                    raise ModelMissing("please load model '{0}' by calling "
+                                       "method load_model('{0}') of device "
+                                       "{1}"
                                        .format(url_to_name[ret.group(1)],
                                                self.device))
                 else:
-                    raise ConfigError("unknown model URL '{}'" \
+                    raise ConfigError("unknown model URL '{}'"
                                       .format(ret.group(1)))
         return roots
 
@@ -269,16 +272,20 @@ class Config(object):
 
             # clean up empty NP containers
             child_schema_node = self.device.get_schema_node(child)
-            if len(child) == 0 and \
-               child_schema_node.get('type') == 'container' and \
-               child_schema_node.get('presence') != 'true':
+            if (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'container' and
+                child_schema_node.get('presence') != 'true'
+            ):
                 self.ele.remove(child)
-            elif len(child) == 0 and \
-                 child_schema_node.get('type') == 'list':
-                logger.warning("empty list entry {} under {} is pruned" \
-                               .format(child.tag,
-                                       self.device \
-                                           .get_xpath(child.getparent())))
+            elif (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'list'
+            ):
+                logger.warning(
+                    "empty list entry {} under {} is pruned"
+                    .format(child.tag,
+                            self.device.get_xpath(child.getparent())))
                 self.ele.remove(child)
 
     def ns_help(self):
@@ -364,18 +371,18 @@ class Config(object):
         c = Composer(self.device, node)
         if c.schema_node is None:
             p = self.device.get_xpath(node, instance=False)
-            raise ConfigError('schema node of the config node not ' \
+            raise ConfigError('schema node of the config node not '
                               'found: {}'.format(p))
         if c.schema_node.get('type') == 'list':
             for key in c.keys:
                 if node.find(key) is None:
                     p = self.device.get_xpath(node, instance=False)
-                    raise ConfigError("missing key '{}' of the config " \
+                    raise ConfigError("missing key '{}' of the config "
                                       "node {}".format(key, p))
         for tag in operation_tag, insert_tag, value_tag, key_tag:
             if node.get(tag):
-                raise ConfigError("the config node contains invalid " \
-                                  "attribute '{}': {}" \
+                raise ConfigError("the config node contains invalid "
+                                  "attribute '{}': {}"
                                   .format(tag, self.device.get_xpath(node)))
 
         for child in node.getchildren():
@@ -385,19 +392,23 @@ class Config(object):
             # clean up empty NP containers
             child_schema_node = self.device.get_schema_node(child)
             if child_schema_node is None:
-                raise ConfigError("schema node of the config node {} cannot " \
-                                  "be found:\n{}" \
+                raise ConfigError("schema node of the config node {} cannot "
+                                  "be found:\n{}"
                                   .format(self.device.get_xpath(child), self))
-            if len(child) == 0 and \
-               child_schema_node.get('type') == 'container' and \
-               child_schema_node.get('presence') != 'true':
+            if (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'container' and
+                child_schema_node.get('presence') != 'true'
+            ):
                 node.remove(child)
-            elif len(child) == 0 and \
-               child_schema_node.get('type') == 'list':
-                logger.warning("empty list entry {} under {} is pruned" \
-                               .format(child.tag,
-                                       self.device \
-                                           .get_xpath(child.getparent())))
+            elif (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'list'
+            ):
+                logger.warning(
+                    "empty list entry {} under {} is pruned"
+                    .format(child.tag,
+                            self.device.get_xpath(child.getparent())))
                 node.remove(child)
 
     def _node_filter(self, node, ancestors, filtrates):
@@ -430,8 +441,10 @@ class Config(object):
         elif node in ancestors:
             if node.tag != config_tag:
                 s_node = self.get_schema_node(node)
-            if node.tag != config_tag and \
-               s_node.get('type') == 'list':
+            if (
+                node.tag != config_tag and
+                s_node.get('type') == 'list'
+            ):
                 for child in node.getchildren():
                     s_node = self.get_schema_node(child)
                     if s_node.get('is_key') or child in filtrates:
@@ -466,8 +479,8 @@ class ConfigDelta(object):
         a transition.
 
     config_dst : `Config`
-        An instance of yang.ncdiff.Config, which is the destination config state
-        of a transition.
+        An instance of yang.ncdiff.Config, which is the destination config
+        state of a transition.
 
     nc : `Element`
         A lxml Element which contains the delta. This attribute can be used by
@@ -475,8 +488,8 @@ class ConfigDelta(object):
         ConfigDelta instance.
 
     ns : `dict`
-        A dictionary of namespaces used by the attribute 'nc'. Keys are prefixes
-        and values are URLs.
+        A dictionary of namespaces used by the attribute 'nc'. Keys are
+        prefixes and values are URLs.
 
     models : `list`
         A list of model names that self.roots belong to.
@@ -496,53 +509,63 @@ class ConfigDelta(object):
     preferred_delete : `str`
         Preferred operation of deleting an existing element. Choice of
         'delete' or 'remove'.
+
+    diff_type : `str`
+        Choice of 'minimum' or 'replace'. This value has impact on attribute
+        nc. In general, there are two options to construct nc. The first
+        option is to find out minimal changes between config_src and
+        config_dst. Then attribute nc will reflect what needs to be modified.
+        The second option is to use 'replace' operation in Netconf. More
+        customers prefer 'replace' operation as it is more deterministic.
     '''
 
     def __init__(self, config_src, config_dst=None, delta=None,
                  preferred_create='merge',
                  preferred_replace='merge',
-                 preferred_delete='delete'):
+                 preferred_delete='delete',
+                 diff_type='minimum'):
         '''
         __init__ instantiates a ConfigDelta instance.
         '''
 
+        self.diff_type = diff_type
         if not isinstance(config_src, Config):
-            raise TypeError("argument 'config_src' must be " \
-                            "yang.ncdiff.Config, but not '{}'" \
+            raise TypeError("argument 'config_src' must be "
+                            "yang.ncdiff.Config, but not '{}'"
                             .format(type(config_src)))
         if preferred_create in ['merge', 'create', 'replace']:
             self.preferred_create = preferred_create
         else:
-            raise ValueError("only 'merge', 'create' or 'replace' are valid " \
+            raise ValueError("only 'merge', 'create' or 'replace' are valid "
                              "values of 'preferred_create'")
         if preferred_replace in ['merge', 'replace']:
             self.preferred_replace = preferred_replace
         else:
-            raise ValueError("only 'merge' or 'replace' are valid " \
+            raise ValueError("only 'merge' or 'replace' are valid "
                              "values of 'preferred_replace'")
         if preferred_delete in ['delete', 'remove']:
             self.preferred_delete = preferred_delete
         else:
-            raise ValueError("only 'delete' or 'remove' are valid " \
+            raise ValueError("only 'delete' or 'remove' are valid "
                              "values of 'preferred_delete'")
         self.config_src = config_src
         if delta is not None:
             if isinstance(delta, str) or etree.iselement(delta):
                 delta = NetconfParser(self.device, delta).ele
             else:
-                raise TypeError("argument 'delta' must be XML string, " \
-                                "Element, but not '{}'" \
+                raise TypeError("argument 'delta' must be XML string, "
+                                "Element, but not '{}'"
                                 .format(type(delta)))
         if not isinstance(config_dst, Config) and config_dst is not None:
-            raise TypeError("argument 'config_dst' must be " \
-                            "yang.ncdiff.Config or None, but not '{}'" \
+            raise TypeError("argument 'config_dst' must be "
+                            "yang.ncdiff.Config or None, but not '{}'"
                             .format(type(config_dst)))
         self.config_dst = config_dst
         if self.config_dst is None and delta is None:
             self.config_dst = self.config_src
         if delta is not None:
             if self.config_dst is not None:
-                logger.warning("argument 'config_dst' is ignored as 'delta' " \
+                logger.warning("argument 'config_dst' is ignored as 'delta' "
                                "is provided")
             self.config_dst = self.config_src + delta
         else:
@@ -554,11 +577,22 @@ class ConfigDelta(object):
 
     @property
     def nc(self):
-        return NetconfCalculator(self.device,
-                                 self.config_dst.ele, self.config_src.ele,
-                                 preferred_create=self.preferred_create,
-                                 preferred_replace=self.preferred_replace,
-                                 preferred_delete=self.preferred_delete).sub
+        if self.diff_type == 'replace':
+            return NetconfCalculator(
+                self.device,
+                self.config_dst.ele, self.config_src.ele,
+                preferred_create=self.preferred_create,
+                preferred_replace=self.preferred_replace,
+                preferred_delete=self.preferred_delete,
+                ).get_config_replace()
+        else:
+            return NetconfCalculator(
+                self.device,
+                self.config_dst.ele, self.config_src.ele,
+                preferred_create=self.preferred_create,
+                preferred_replace=self.preferred_replace,
+                preferred_delete=self.preferred_delete,
+            ).sub
 
     @property
     def ns(self):
@@ -566,7 +600,7 @@ class ConfigDelta(object):
 
     @property
     def models(self):
-        return sorted(list(set(self.config_src.models + \
+        return sorted(list(set(self.config_src.models +
                                self.config_dst.models)))
 
     @property
@@ -645,8 +679,8 @@ class ConfigCompatibility(object):
         self.config1 as in self.config2.
 
     is_compatible : `dict`
-        True if self.models_compatible is True and self.namespaces_compatible is
-        True.
+        True if self.models_compatible is True and self.namespaces_compatible
+        is True.
     '''
 
     def __init__(self, config1, config2):
@@ -668,10 +702,11 @@ class ConfigCompatibility(object):
             for device in [self.config1.device, self.config2.device]:
                 missing_models = set(models) - set(device.models_loaded)
                 if missing_models:
-                    raise ModelMissing('please load model {} by calling ' \
-                                       'method load_model() of device {}' \
-                                       .format(str(list(missing_models))[1:-1],
-                                               device))
+                    raise ModelMissing(
+                        'please load model {} by calling '
+                        'method load_model() of device {}'
+                        .format(str(list(missing_models))[1:-1],
+                                device))
 
         check_models(self.models)
         for model in self.models:
@@ -679,10 +714,10 @@ class ConfigCompatibility(object):
                              self.config2.device.models[model])
             if diff:
                 logger.debug(str(self))
-                raise ModelIncompatible("model '{}' on device {} is " \
-                                        "different from the one on device {}" \
-                                        .format(model, self.config1.device,
-                                                       self.config2.device))
+                raise ModelIncompatible(
+                    "model '{}' on device {} is "
+                    "different from the one on device {}"
+                    .format(model, self.config1.device, self.config2.device))
         return True
 
     @property
@@ -694,7 +729,7 @@ class ConfigCompatibility(object):
             for device in [self.config1.device, self.config2.device]:
                 missing_models = set(models) - set(device.models_loadable)
                 if missing_models:
-                    raise ModelMissing('model {} does not exist on device {}' \
+                    raise ModelMissing('model {} does not exist on device {}'
                                        .format(str(list(missing_models))[1:-1],
                                                device))
 
@@ -705,9 +740,9 @@ class ConfigCompatibility(object):
             prefix2 = [i[1] for i in self.config2.device.namespaces
                        if i[0] == model][0]
             if prefix1 != prefix2:
-                raise ModelIncompatible("model '{}' uses prefix '{}' on " \
-                                        "device {}, but uses prefix '{}' on " \
-                                        "device {}" \
+                raise ModelIncompatible("model '{}' uses prefix '{}' on "
+                                        "device {}, but uses prefix '{}' on "
+                                        "device {}"
                                         .format(model,
                                                 prefix1, self.config1.device,
                                                 prefix2, self.config2.device))
@@ -716,8 +751,8 @@ class ConfigCompatibility(object):
             url2 = [i[2] for i in self.config2.device.namespaces
                     if i[0] == model][0]
             if url1 != url2:
-                raise ModelIncompatible("model '{}' uses url '{}' on device " \
-                                        "{}, but uses url '{}' on device {}" \
+                raise ModelIncompatible("model '{}' uses url '{}' on device "
+                                        "{}, but uses url '{}' on device {}"
                                         .format(model,
                                                 url1, self.config1.device,
                                                 url2, self.config2.device))
