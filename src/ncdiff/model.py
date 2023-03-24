@@ -23,6 +23,8 @@ from .errors import ModelError
 
 # create a logger for this module
 logger = logging.getLogger(__name__)
+logging.getLogger('ncclient.transport').setLevel(logging.WARNING)
+logging.getLogger('ncclient.operations').setLevel(logging.WARNING)
 
 PARSER = etree.XMLParser(encoding='utf-8', remove_blank_text=True)
 
