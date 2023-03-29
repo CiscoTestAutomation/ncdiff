@@ -1,0 +1,45 @@
+module jon {
+  namespace "urn:jon";
+  prefix jon;
+
+  revision 2023-03-29 {
+    description
+      "Initial revision";
+  }
+
+  leaf foo {
+    type string;
+  }
+
+  container tracking {
+    leaf enabled {
+      type boolean;
+    }
+  }
+
+  list address {
+    key "last first";
+    ordered-by user;
+    leaf last {
+      type string;
+      description "Last name";
+    }
+    leaf first {
+      type string;
+      description "First name";
+    }
+    leaf street {
+      type string;
+      description "Street name";
+    }
+    leaf city {
+      type string;
+      description "City name";
+    }
+  }
+
+  leaf-list store {
+    ordered-by user;
+    default "Target";
+  }
+}
