@@ -18,6 +18,8 @@ nc_url = xml_.BASE_NS_1_0
 yang_url = 'urn:ietf:params:xml:ns:yang:1'
 operation_tag = '{' + nc_url + '}operation'
 insert_tag = '{' + yang_url + '}insert'
+value_tag = '{' + yang_url + '}value'
+key_tag = '{' + yang_url + '}key'
 
 
 def my_execute(*args, **kwargs):
@@ -1041,7 +1043,7 @@ class TestNcDiff(unittest.TestCase):
                 <address xmlns="urn:jon">
                   <last>Wang</last>
                   <first>Ken</first>
-                  <street>Main</street>
+                  <street>Second</street>
                   <city>Boston</city>
                 </address>
                 <store xmlns="urn:jon">Dollar</store>
@@ -1073,15 +1075,35 @@ class TestNcDiff(unittest.TestCase):
                                  namespaces=delta.ns)
         self.assertEqual(address[0].get(operation_tag), 'replace')
         self.assertEqual(address[0].get(insert_tag), 'first')
-        street = address[0].xpath('//jon:street',
+        street = address[0].xpath('jon:street',
                                   namespaces=delta.ns)[0]
         self.assertEqual(street.text, 'Carp')
+        self.assertEqual(address[1].get(operation_tag), 'replace')
+        self.assertEqual(address[1].get(insert_tag), 'after')
+        self.assertEqual(address[1].get(key_tag),
+                         "[first='Bob'][last='Brown']")
+        street = address[1].xpath('jon:street',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(street.text, 'Second')
+        self.assertEqual(address[2].get(operation_tag), 'delete')
+        first = address[2].xpath('jon:first',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(first.text, 'Bob')
+        last = address[2].xpath('jon:last',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(last.text, 'Paul')
 
         # leaf-list store
         store = delta.nc.xpath('//nc:config/jon:store', namespaces=delta.ns)
         self.assertEqual(store[0].get(operation_tag), 'replace')
         self.assertEqual(store[0].get(insert_tag), 'first')
         self.assertEqual(store[0].text, 'Dollar')
+        self.assertEqual(store[1].get(operation_tag), 'replace')
+        self.assertEqual(store[1].get(insert_tag), 'after')
+        self.assertEqual(store[1].get(value_tag), 'Dollar')
+        self.assertEqual(store[1].text, 'Cheap')
+        self.assertEqual(store[2].get(operation_tag), 'delete')
+        self.assertEqual(store[2].text, 'Quick')
 
         config3 = config1 + delta
         self.assertEqual(config2, config3)

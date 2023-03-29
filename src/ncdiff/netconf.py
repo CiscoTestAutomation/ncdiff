@@ -223,7 +223,7 @@ class NetconfCalculator(BaseCalculator):
 
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
-                                       {operation_tag: 'remove'},
+                                       {operation_tag: self.preferred_delete},
                                        nsmap=child_other.nsmap)
             siblings = list(ele.iterchildren(tag=child_other.tag))
             if siblings:
