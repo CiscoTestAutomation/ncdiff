@@ -12,6 +12,8 @@ SHORT_NO_COMMANDS = [
     'no license boot level ',
     'no transport input ',
     'no transport output ',
+    'no ip address ',
+    'no ipv6 address ',
 ]
 
 # Some commands are orderless, e.g., "show running-config" output could be:
@@ -22,6 +24,7 @@ SHORT_NO_COMMANDS = [
 # aaa authentication login admin-con group tacacs+ local
 ORDERLESS_COMMANDS = [
     r'^ *aaa authentication login ',
+    r'^ *logging host ',
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
@@ -34,6 +37,8 @@ OVERWRITABLE_COMMANDS = [
     r'^ *username \S+ privilege [0-9]+ password ',
     r'^ *password ',
     r'^ *description ',
+    r'^ *ip address( |$)',
+    r'^ *ipv6 address( |$)',
 ]
 
 # Some commands look like a parent-child relation but actually they are
@@ -208,6 +213,7 @@ class RunningConfigDiff(object):
         self.running1 = running1
         self.running2 = running2
         self._diff_list = None
+        self._diff_list_reverse = None
 
     def __bool__(self):
         return bool(self.diff)
@@ -223,12 +229,11 @@ class RunningConfigDiff(object):
 
     @property
     def diff(self):
-        list1 = self.running2list(self.running1)
-        list2 = self.running2list(self.running2)
-        self.handle_sibling_cammands(list1)
-        self.handle_sibling_cammands(list2)
-        self._diff_list = ListDiff(list1, list2).diff
-        return self._diff_list if self._diff_list else None
+        return self.get_diff(reverse=False)
+
+    @property
+    def diff_reverse(self):
+        return self.get_diff(reverse=True)
 
     @property
     def cli(self):
@@ -238,18 +243,30 @@ class RunningConfigDiff(object):
     def cli_reverse(self):
         return self.get_cli(reverse=True)
 
-    def get_cli(self, reverse=False):
+    def get_diff(self, reverse=False):
         if self._diff_list is None:
-            self.diff
-        positive_str, negative_str = self.list2cli(
-            self._diff_list, reverse=reverse)
-        if positive_str:
-            if negative_str:
-                return negative_str + '\n!\n' + positive_str
+            list1 = self.running2list(self.running1)
+            list2 = self.running2list(self.running2)
+            self.handle_sibling_cammands(list1)
+            self.handle_sibling_cammands(list2)
+            self._diff_list = ListDiff(list1, list2).diff
+            self._diff_list_reverse = ListDiff(list2, list1).diff
+        diff_list = self._diff_list_reverse if reverse else self._diff_list
+        return diff_list if diff_list else None
+
+    def get_cli(self, reverse=False):
+        diff_list = self.get_diff(reverse=reverse)
+        if diff_list:
+            positive_str, negative_str = self.list2cli(diff_list)
+            if positive_str:
+                if negative_str:
+                    return negative_str + '\n!\n' + positive_str
+                else:
+                    return positive_str
             else:
-                return positive_str
+                return negative_str
         else:
-            return negative_str
+            return ''
 
     def running2list(self, str_in):
         str_in = str_in.replace('exit-address-family', ' exit-address-family')
@@ -353,25 +370,19 @@ class RunningConfigDiff(object):
                 )
         return str_ret
 
-    def list2cli(self, list_in, reverse=False):
+    def list2cli(self, list_in):
         if list_in is None:
             return ''
-        plus = '-' if reverse else '+'
-        minus = '+' if reverse else '-'
         positive_list = []
         negative_list = []
-        positive_keys = [k for k, v, i in list_in if i == plus and v is None]
+        positive_keys = [k for k, v, i in list_in if i == '+' and v is None]
         for k, v, i in list_in:
             if k == '':
                 continue
             if v is None:
-                if i == plus:
-                    cmd, is_no_cmd = self.handle_commands(k)
-                    if is_no_cmd:
-                        negative_list.append(cmd)
-                    else:
-                        positive_list.append(cmd)
-                elif i == minus:
+                if i == '+':
+                    self.append_command(k, negative_list, positive_list)
+                elif i == '-':
                     # In a case that a CLI is updated, no command is not
                     # needed:
                     # - service timestamps debug datetime msec
@@ -381,42 +392,39 @@ class RunningConfigDiff(object):
                     matching_positive_keys = [
                         key for key in positive_keys if key[:key_len] == k]
                     if not matching_positive_keys:
-                        cmd, is_no_cmd = self.handle_commands('no ' + k)
-                        if is_no_cmd:
-                            negative_list.append(cmd)
-                        else:
-                            positive_list.append(cmd)
+                        self.append_command('no ' + k,
+                                            negative_list, positive_list)
             else:
                 if i == '':
-                    positive_str, negative_str = self.list2cli(
-                        v, reverse=reverse)
+                    positive_str, negative_str = self.list2cli(v)
                     if positive_str:
                         positive_list.append(
                             k + '\n' + self.indent(positive_str).rstrip())
                     if negative_str:
                         negative_list.append(
                             k + '\n' + self.indent(negative_str).rstrip())
-                if i == plus:
+                if i == '+':
                     positive_str = self.list2config(v, diff_type=None).rstrip()
                     if positive_str:
                         positive_list.append(k + '\n' + positive_str)
                     else:
                         positive_list.append(k)
-                elif i == minus:
-                    cmd, is_no_cmd = self.handle_commands('no ' + k)
-                    if is_no_cmd:
-                        negative_list.append(cmd)
-                    else:
-                        positive_list.append(cmd)
+                elif i == '-':
+                    self.append_command('no ' + k,
+                                        negative_list, positive_list)
 
         # Handle overwritable commands
+        idx_positive_dict = {}
+        idx_positive_list = []
         for regx in OVERWRITABLE_COMMANDS:
-            for cmd in positive_list:
+            for idx_positive, cmd in enumerate(positive_list):
                 m = re.search(regx, cmd)
                 if m:
+
+                    # Remove matching negative CLIs
                     exact_cmd = 'no ' + m.group(0).lstrip()
                     len_exact_cmd = len(exact_cmd)
-                    for idx, line in enumerate(negative_list):
+                    for idx_negative, line in enumerate(negative_list):
                         cmd_line = line.lstrip()
                         if (
                             len(cmd_line) >= len_exact_cmd and
@@ -424,8 +432,20 @@ class RunningConfigDiff(object):
                         ):
                             break
                     else:
-                        continue
-                    del negative_list[idx]
+                        idx_negative = None
+                    if idx_negative is not None:
+                        del negative_list[idx_negative]
+
+                    # Overwrite previous matching positive CLIs
+                    exact_cmd = m.group(0).strip()
+                    if exact_cmd in idx_positive_dict:
+                        idx_positive_list.append(idx_positive_dict[exact_cmd])
+                    idx_positive_dict[exact_cmd] = idx_positive
+
+        if idx_positive_list:
+            idx_positive_list.sort()
+            for idx in reversed(idx_positive_list):
+                del positive_list[idx]
 
         # Handle duplicate commands
         # Some commands their positive and negative lines are both appeared in
@@ -439,16 +459,24 @@ class RunningConfigDiff(object):
         return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
 
     @staticmethod
-    def handle_commands(cmd):
+    def append_command(cmd, negative_list, positive_list):
+        cmd, is_no_cmd = RunningConfigDiff.handle_command(cmd)
+        if is_no_cmd:
+            negative_list.append(cmd)
+        else:
+            positive_list.append(cmd)
+
+    @staticmethod
+    def handle_command(cmd):
         if cmd[:6] == 'no no ':
-            return cmd[6:], False
+            return cmd[6:].strip(), False
         for short_cmd in SHORT_NO_COMMANDS:
             if cmd[:len(short_cmd)] == short_cmd:
-                return short_cmd, True
+                return short_cmd.strip(), True
         if cmd[:3] == 'no ':
-            return cmd, True
+            return cmd.strip(), True
         else:
-            return cmd, False
+            return cmd.strip(), False
 
     @staticmethod
     def handle_orderless(running):

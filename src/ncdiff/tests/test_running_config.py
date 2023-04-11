@@ -449,3 +449,116 @@ abc def
         self.assertEqual(len(actual_lines), len(expected_lines))
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_ip_address(self):
+        config_1 = """
+interface GigabitEthernet8/0/1
+!
+interface Vlan69
+ ip address 192.168.100.1 255.255.255.0
+!
+interface Vlan70
+ ip address 192.168.101.1 255.255.255.0
+        """
+        config_2 = """
+ip dhcp pool Test
+ network 1.1.0.0 255.255.0.0
+!
+interface GigabitEthernet8/0/1
+ no switchport
+ ip address dhcp
+ shutdown
+!
+interface Vlan69
+ no ip address
+ ipv6 address 2001:FACE::1/64
+ ipv6 enable
+ ipv6 dhcp relay destination 2001:1234::2
+!
+interface Vlan70
+ no ip address
+ ipv6 address 2001:1234::1/64
+ ipv6 enable
+        """
+        expected_cli = """
+interface Vlan70
+  no ip address
+interface Vlan69
+  no ip address
+interface GigabitEthernet8/0/1
+  no switchport
+!
+ip dhcp pool Test
+  network 1.1.0.0 255.255.0.0
+interface GigabitEthernet8/0/1
+  ip address dhcp
+  shutdown
+interface Vlan69
+  ipv6 address 2001:FACE::1/64
+  ipv6 enable
+  ipv6 dhcp relay destination 2001:1234::2
+interface Vlan70
+  ipv6 address 2001:1234::1/64
+  ipv6 enable
+        """
+        expected_reverse_cli = """
+interface Vlan70
+  no ipv6 enable
+  no ipv6 address
+interface Vlan69
+  no ipv6 dhcp relay destination 2001:1234::2
+  no ipv6 enable
+  no ipv6 address
+interface GigabitEthernet8/0/1
+  no shutdown
+  no ip address
+no ip dhcp pool Test
+!
+interface GigabitEthernet8/0/1
+  switchport
+interface Vlan69
+  ip address 192.168.100.1 255.255.255.0
+interface Vlan70
+  ip address 192.168.101.1 255.255.255.0
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+        actual_reverse_cli = running_diff.cli_reverse.strip()
+        expected_reverse_cli = expected_reverse_cli.strip()
+        actual_lines = actual_reverse_cli.split('\n')
+        expected_lines = expected_reverse_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_logging_host(self):
+        config_1 = """
+logging host 10.15.118.120
+logging host 10.200.159.168
+logging host 10.200.209.215
+        """
+        config_2 = """
+logging host 10.200.209.215
+logging host 10.15.118.120
+logging host 10.200.159.168
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
