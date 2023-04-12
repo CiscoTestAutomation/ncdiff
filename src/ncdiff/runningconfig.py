@@ -196,7 +196,12 @@ class RunningConfigDiff(object):
         Second Cisco running-config.
 
     diff : `list`
-        A list from class ListDiff attribute diff.
+        A list from class ListDiff attribute diff, representing changes from
+        running1 to running2.
+
+    diff_reverse : `list`
+        A list from class ListDiff attribute diff, representing changes from
+        running2 to running1.
 
     cli : `str`
         CLIs that transits from running1 to running2.

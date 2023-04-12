@@ -267,17 +267,18 @@ class Config(object):
         '''
 
         self.roots
-        for child in self.ele.getchildren():
-            self._validate_node(child)
+        for child in self.ele:
+            child_schema_node = self.device.get_schema_node(child)
 
             # clean up empty NP containers
-            child_schema_node = self.device.get_schema_node(child)
             if (
                 len(child) == 0 and
                 child_schema_node.get('type') == 'container' and
                 child_schema_node.get('presence') != 'true'
             ):
                 self.ele.remove(child)
+
+            # cleanup empty list instance
             elif (
                 len(child) == 0 and
                 child_schema_node.get('type') == 'list'
@@ -287,6 +288,16 @@ class Config(object):
                     .format(child.tag,
                             self.device.get_xpath(child.getparent())))
                 self.ele.remove(child)
+
+            # cleanup obsoleted or deprecated nodes
+            elif (
+                child_schema_node.get('status') == 'obsolete' or
+                child_schema_node.get('status') == 'deprecated'
+            ):
+                self.ele.remove(child)
+
+            elif len(child) > 0:
+                self._validate_node(child)
 
     def ns_help(self):
         '''ns_help
@@ -385,22 +396,23 @@ class Config(object):
                                   "attribute '{}': {}"
                                   .format(tag, self.device.get_xpath(node)))
 
-        for child in node.getchildren():
-            if len(child) > 0:
-                self._validate_node(child)
+        for child in node:
 
-            # clean up empty NP containers
             child_schema_node = self.device.get_schema_node(child)
             if child_schema_node is None:
                 raise ConfigError("schema node of the config node {} cannot "
                                   "be found:\n{}"
                                   .format(self.device.get_xpath(child), self))
+
+            # clean up empty NP containers
             if (
                 len(child) == 0 and
                 child_schema_node.get('type') == 'container' and
                 child_schema_node.get('presence') != 'true'
             ):
                 node.remove(child)
+
+            # cleanup empty list instance
             elif (
                 len(child) == 0 and
                 child_schema_node.get('type') == 'list'
@@ -410,6 +422,16 @@ class Config(object):
                     .format(child.tag,
                             self.device.get_xpath(child.getparent())))
                 node.remove(child)
+
+            # cleanup obsoleted or deprecated nodes
+            elif (
+                child_schema_node.get('status') == 'obsolete' or
+                child_schema_node.get('status') == 'deprecated'
+            ):
+                self.ele.remove(child)
+
+            elif len(child) > 0:
+                self._validate_node(child)
 
     def _node_filter(self, node, ancestors, filtrates):
         '''_node_filter
