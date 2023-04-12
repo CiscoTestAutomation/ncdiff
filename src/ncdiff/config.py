@@ -428,7 +428,7 @@ class Config(object):
                 child_schema_node.get('status') == 'obsolete' or
                 child_schema_node.get('status') == 'deprecated'
             ):
-                self.ele.remove(child)
+                node.remove(child)
 
             elif len(child) > 0:
                 self._validate_node(child)
