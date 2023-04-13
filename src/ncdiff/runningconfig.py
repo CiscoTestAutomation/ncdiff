@@ -105,21 +105,19 @@ class ListDiff(object):
         diff_1 = []
         key_list_1 = [i[0] for i in list1]
         key_list_2 = [i[0] for i in list2]
-        common_key_list = [k for k in key_list_1 if k in key_list_2]
-        if common_key_list:
-            common_1 = list(filter(lambda x: x in common_key_list, key_list_1))
-            common_2 = list(filter(lambda x: x in common_key_list, key_list_2))
-            common_key_list = []
-            list1_index = 0
-            for k2 in common_2:
-                if k2 in common_1[list1_index:]:
-                    common_key_list.append(k2)
-                    list1_index = common_1.index(k2)
-
+        common_key_list = []
+        previous_index_1 = previous_index_2 = 0
+        for k2 in key_list_2:
+            if k2 in key_list_1[previous_index_1:]:
+                common_key_list.append(k2)
+                previous_index_1 += key_list_1[previous_index_1:].index(k2) + 1
+                previous_index_2 += key_list_2[previous_index_2:].index(k2) + 1
         previous_index_1 = previous_index_2 = 0
         for key in common_key_list:
-            current_index_1 = key_list_1.index(key)
-            current_index_2 = key_list_2.index(key)
+            current_index_1 = previous_index_1 + \
+                key_list_1[previous_index_1:].index(key)
+            current_index_2 = previous_index_2 + \
+                key_list_2[previous_index_2:].index(key)
 
             # Stuff in list1 before a common key but not in list2
             for k, v, i in list1[previous_index_1:current_index_1]:
