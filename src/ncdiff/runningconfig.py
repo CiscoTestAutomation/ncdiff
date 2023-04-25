@@ -25,6 +25,7 @@ SHORT_NO_COMMANDS = [
 ORDERLESS_COMMANDS = [
     r'^ *aaa authentication login ',
     r'^ *logging host ',
+    r'^ *flow monitor ',
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
