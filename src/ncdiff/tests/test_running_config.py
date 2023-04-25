@@ -562,3 +562,36 @@ logging host 10.200.159.168
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_cli_flow_mon(self):
+        config_1 = """
+flow monitor eta-mon
+flow monitor meraki_monitor
+  exporter meraki_exporter
+  exporter customer_exporter
+  record meraki_record
+flow monitor meraki_monitor_ipv6
+  exporter meraki_exporter
+  exporter customer_exporter
+  record meraki_record_ipv6
+        """
+        config_2 = """
+flow monitor meraki_monitor
+  exporter meraki_exporter
+  exporter customer_exporter
+  record meraki_record
+flow monitor meraki_monitor_ipv6
+  exporter meraki_exporter
+  exporter customer_exporter
+  record meraki_record_ipv6
+flow monitor eta-mon
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
