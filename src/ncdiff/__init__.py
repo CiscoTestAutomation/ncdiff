@@ -4,9 +4,8 @@ payload of a Netconf get-config reply, and a diff is the payload of a
 edit-config message."""
 
 # metadata
-__version__ = '23.3'
+__version__ = '23.6'
 __author__ = 'Jonathan Yang <yuekyang@cisco.com>'
-__contact__ = 'yang-python@cisco.com'
 __copyright__ = 'Cisco Systems, Inc.'
 
 # __import__('pkg_resources').declare_namespace(__name__)
