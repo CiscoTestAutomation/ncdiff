@@ -1,9 +1,6 @@
 import re
-import json
 import logging
-from lxml import etree
 from ncclient import xml_
-from xml.etree import ElementTree
 
 from .errors import ModelMissing
 
@@ -78,7 +75,8 @@ class Composer(object):
         Model URL that the root of self.node belongs to.
 
     is_config : `bool`
-        True if self.node is a config node, False if self.node is a schema node.
+        True if self.node is a config node, False if self.node is a schema
+        node.
 
     schema_node : `Element`
         Coresponding model schema node of self.node if self.node is a config
@@ -112,15 +110,15 @@ class Composer(object):
                 url_to_name = {i[2]: i[0] for i in self.device.namespaces
                                if i[1] is not None}
                 if ret.group(1) in url_to_name:
-                    raise ModelMissing("please load model '{}' by calling " \
-                                       "method load_model() of device {}" \
+                    raise ModelMissing("please load model '{}' by calling "
+                                       "method load_model() of device {}"
                                        .format(url_to_name[ret.group(1)],
                                                self.device))
                 else:
-                    raise ModelMissing("unknown model url '{}'" \
+                    raise ModelMissing("unknown model url '{}'"
                                        .format(ret.group(1)))
             else:
-                raise ModelMissing("unknown model root '{}'" \
+                raise ModelMissing("unknown model root '{}'"
                                    .format(self.path[0]))
 
     @property
@@ -207,8 +205,10 @@ class Composer(object):
                         if n.schema_node.get('type') == 'leaf-list' and \
                            not (index == len(nodes)-1 and not instance):
                             ret += '[text()="{}"]'.format(node.text)
-                        elif n.schema_node.get('type') == 'list' and \
-                             not (index == len(nodes)-1 and not instance):
+                        elif (
+                            n.schema_node.get('type') == 'list' and
+                            not (index == len(nodes)-1 and not instance)
+                        ):
                             for key in n.keys:
                                 id = self.device.convert_tag(default_ns, key,
                                                              dst=type)[1]
@@ -217,7 +217,7 @@ class Composer(object):
             return ret
 
         nodes = list(reversed(list(self.node.iterancestors())))[1:] + \
-                [self.node]
+            [self.node]
         if type == Tag.YTOOL:
             return self.model_name + convert(self.model_ns, nodes, type)
         else:
