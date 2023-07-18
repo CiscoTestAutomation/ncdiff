@@ -5,6 +5,7 @@ from ncclient import xml_
 
 from .ref import IdentityRef, InstanceIdentifier
 from .errors import ConfigError
+from .composer import Composer
 
 # create a logger for this module
 logger = logging.getLogger(__name__)
@@ -261,8 +262,7 @@ class BaseCalculator(object):
 
         return (in_1_not_in_2, in_2_not_in_1, in_1_and_in_2)
 
-    @staticmethod
-    def _get_list_keys(schema_node):
+    def _get_list_keys(self, schema_node):
         '''_get_list_keys
 
         Low-level api: Given a schema node, in particular, a list type schema
@@ -281,9 +281,8 @@ class BaseCalculator(object):
             A list of tags of keys in `{url}tagname` notation.
         '''
 
-        nodes = list(filter(lambda x: x.get('is_key'),
-                            schema_node.getchildren()))
-        return sorted([n.tag for n in nodes])
+        composer = Composer(self.device, schema_node)
+        return composer.keys
 
     def _get_peers(self, child_self, parent_other):
         '''_get_peers

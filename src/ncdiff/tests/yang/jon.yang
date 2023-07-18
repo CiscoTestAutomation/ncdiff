@@ -18,7 +18,7 @@ module jon {
   }
 
   list address {
-    key "last first";
+    key "first last";
     ordered-by user;
     leaf last {
       type string;

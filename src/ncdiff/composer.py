@@ -12,6 +12,15 @@ logger = logging.getLogger(__name__)
 
 config_tag = '{' + xml_.BASE_NS_1_0 + '}config'
 
+
+def split_tag(tag, tag_type):
+    ret = re.search(tag_type[2][0], tag)
+    if ret:
+        return (ret.group(1), ret.group(2))
+    else:
+        return ('', tag)
+
+
 class Tag(object):
     '''Tag
 
@@ -32,9 +41,9 @@ class Tag(object):
     OMIT_BY_MODULE = 12
 
     # {namespace}tagname
-    BRACE = ['^{(.+)}(.+)$', '{{{}}}{}']
+    BRACE = [r'^\{(.+)\}(.+)$', '{{{}}}{}']
     # namespace:tagname
-    COLON = ['^(.+):(.+)$', '{}:{}']
+    COLON = [r'^(.+):(.+)$', '{}:{}']
 
     YTOOL = (PREFIX, OMIT_BY_MODULE, COLON)
     XPATH = (PREFIX, OMIT_BY_INHERITANCE, COLON)
@@ -137,10 +146,25 @@ class Composer(object):
 
     @property
     def keys(self):
+        def find_key_tag(tag):
+            for child_node in self.schema_node:
+                if split_tag(child_node.tag, Tag.LXML_ETREE)[1] == tag:
+                    return child_node.tag
+            else:
+                return None
+
+        # According to RFC 7950 section 7.8.5 XML Encoding Rules, the list's
+        # key nodes are encoded as subelements to the list's identifier
+        # element, in the same order as they are defined within the "key"
+        # statement.
         if self.schema_node.get('type') == 'list':
-            nodes = list(filter(lambda x: x.get('is_key'),
-                                self.schema_node.getchildren()))
-            return [n.tag for n in nodes]
+            keys = self.schema_node.get('key')
+            if keys is None:
+                return []
+            keys = [split_tag(i, Tag.JSON_PREFIX)[1]
+                    for i in re.split(' +', keys)]
+            key_tags = [find_key_tag(key) for key in keys]
+            return [key_tag for key_tag in key_tags if key_tag is not None]
         else:
             return []
 
