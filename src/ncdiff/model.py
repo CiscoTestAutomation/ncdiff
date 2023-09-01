@@ -504,7 +504,10 @@ class DownloadWorker(Thread):
             except queue.Empty:
                 pass
             else:
-                self.downloader.download(module)
+                try:
+                    self.downloader.download(module)
+                except Exception:
+                    logger.exception('Got error while downloading')
                 self.downloader.download_queue.task_done()
         logger.debug('Thread {} exits'.format(current_thread().name))
 
