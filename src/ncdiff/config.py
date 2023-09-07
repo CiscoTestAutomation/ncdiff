@@ -270,6 +270,9 @@ class Config(object):
         for child in self.ele:
             child_schema_node = self.device.get_schema_node(child)
 
+            if len(child) > 0:
+                self._validate_node(child)
+
             # clean up empty NP containers
             if (
                 len(child) == 0 and
@@ -295,9 +298,6 @@ class Config(object):
                 child_schema_node.get('status') == 'deprecated'
             ):
                 self.ele.remove(child)
-
-            elif len(child) > 0:
-                self._validate_node(child)
 
     def ns_help(self):
         '''ns_help
@@ -404,6 +404,9 @@ class Config(object):
                                   "be found:\n{}"
                                   .format(self.device.get_xpath(child), self))
 
+            if len(child) > 0:
+                self._validate_node(child)
+
             # clean up empty NP containers
             if (
                 len(child) == 0 and
@@ -429,9 +432,6 @@ class Config(object):
                 child_schema_node.get('status') == 'deprecated'
             ):
                 node.remove(child)
-
-            elif len(child) > 0:
-                self._validate_node(child)
 
     def _node_filter(self, node, ancestors, filtrates):
         '''_node_filter
