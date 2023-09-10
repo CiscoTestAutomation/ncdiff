@@ -23,9 +23,10 @@ SHORT_NO_COMMANDS = [
 # aaa authentication login admin-vty group tacacs+ local
 # aaa authentication login admin-con group tacacs+ local
 ORDERLESS_COMMANDS = [
-    r'^ *aaa authentication login ',
-    r'^ *logging host ',
-    r'^ *flow monitor ',
+    re.compile(r'^ *aaa authentication login '),
+    re.compile(r'^ *logging host '),
+    re.compile(r'^ *flow monitor '),
+    re.compile(r'^ *service-template '),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
@@ -35,11 +36,11 @@ ORDERLESS_COMMANDS = [
 # username admin privilege 15 password 7 15130F010D24
 # There is no need to send a no command before sending the second line.
 OVERWRITABLE_COMMANDS = [
-    r'^ *username \S+ privilege [0-9]+ password ',
-    r'^ *password ',
-    r'^ *description ',
-    r'^ *ip address( |$)',
-    r'^ *ipv6 address( |$)',
+    re.compile(r'^ *username \S+ privilege [0-9]+ password '),
+    re.compile(r'^ *password '),
+    re.compile(r'^ *description '),
+    re.compile(r'^ *ip address( |$)'),
+    re.compile(r'^ *ipv6 address( |$)'),
 ]
 
 # Some commands look like a parent-child relation but actually they are
@@ -50,7 +51,7 @@ OVERWRITABLE_COMMANDS = [
 #   client 11.0.0.0 255.0.0.0
 #   !
 SIBLING_CAMMANDS = [
-    r'^ *client ',
+    re.compile(r'^ *client '),
 ]
 
 # As for the client command above, its children does not have indentation:
@@ -249,8 +250,7 @@ class RunningConfigDiff(object):
 
     def get_diff(self, reverse=False):
         if self._diff_list is None:
-            list1 = self.running2list(self.running1)
-            list2 = self.running2list(self.running2)
+            list1, list2 = self.running2list(self.running1, self.running2)
             self.handle_sibling_cammands(list1)
             self.handle_sibling_cammands(list2)
             self._diff_list = ListDiff(list1, list2).diff
@@ -272,9 +272,14 @@ class RunningConfigDiff(object):
         else:
             return ''
 
-    def running2list(self, str_in):
-        str_in = str_in.replace('exit-address-family', ' exit-address-family')
-        return self.config2list(self.handle_orderless(str_in))
+    def running2list(self, str_in_1, str_in_2):
+        str_in_1 = str_in_1.replace('exit-address-family',
+                                    ' exit-address-family')
+        str_in_2 = str_in_2.replace('exit-address-family',
+                                    ' exit-address-family')
+        list_1 = self.config2list(str_in_1)
+        list_2 = self.config2list(str_in_2)
+        return self.handle_orderless(list_1, list_2)
 
     def config2list(self, str_in):
         list_ret = []
@@ -483,22 +488,66 @@ class RunningConfigDiff(object):
             return cmd.strip(), False
 
     @staticmethod
-    def handle_orderless(running):
-        lines = running.splitlines()
-        for regx in ORDERLESS_COMMANDS:
-            indexes = []
-            for idx, line in enumerate(lines):
-                if re.search(regx, line):
-                    indexes.append(idx)
-            if len(indexes) < 2:
-                continue
-            matches_dict = {hash(lines[i]): lines[i] for i in indexes}
-            matches_list = [
-                matches_dict[i] for i in sorted(list(matches_dict.keys()))]
-            for i in reversed(indexes):
-                del lines[i]
-            lines = lines[:indexes[0]] + matches_list + lines[indexes[0]:]
-        return '\n'.join(lines)
+    def handle_orderless(list1, list2):
+        # Find common lines that are orderless
+        lines1 = [i[0] for i in list1]
+        matches = {}
+        for idx, item in enumerate(list2):
+            result, match_type = RunningConfigDiff.match_orderless(item[0])
+            if result and item[0] in lines1:
+                matches[item[0]] = match_type, idx
+
+        # Romove common lines from list1 and save them in removed_items
+        last_idx = 0
+        type_start_idx = {}
+        to_be_removed = []
+        for idx, line in enumerate(lines1):
+            if line in matches:
+                if matches[line][0] not in type_start_idx:
+                    type_start_idx[matches[line][0]] = last_idx + 1
+                to_be_removed.append(idx)
+            else:
+                last_idx = idx
+        removed_items = {}
+        for idx in reversed(to_be_removed):
+            removed_items[list1[idx][0]] = list1[idx]
+            del list1[idx]
+
+        # Find common lines
+        lines1 = [i[0] for i in list1]
+        lines2 = [i[0] for i in list2]
+        common_lines = []
+        previous_idx_1 = previous_idx_2 = 0
+        for line2 in lines2:
+            if line2 in lines1[previous_idx_1:]:
+                previous_idx_1 += lines1[previous_idx_1:].index(line2) + 1
+                previous_idx_2 += lines2[previous_idx_2:].index(line2) + 1
+                common_lines.append((previous_idx_1 - 1, previous_idx_2 - 1))
+
+        # Insert common lines back to list1
+        offset_idx_1 = 0
+        previous_idx_2 = 0
+        for line, (line_type, list2_idx) in matches.items():
+            common_idx_1 = 0
+            for i, j in common_lines:
+                if previous_idx_2 <= j and j < list2_idx:
+                    common_idx_1 = i + 1
+                    previous_idx_2 = j
+                if j > list2_idx:
+                    break
+            start_idx = max(common_idx_1 + offset_idx_1,
+                            type_start_idx[line_type])
+            list1.insert(start_idx, removed_items[line])
+            offset_idx_1 = start_idx - common_idx_1 + 1
+
+        return list1, list2
+
+    @staticmethod
+    def match_orderless(line):
+        for idx, regx in enumerate(ORDERLESS_COMMANDS):
+            if re.search(regx, line):
+                return True, idx
+        return False, None
 
     @staticmethod
     def remove_duplicate_cammands(config_list):
