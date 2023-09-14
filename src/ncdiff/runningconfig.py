@@ -27,6 +27,10 @@ ORDERLESS_COMMANDS = [
     re.compile(r'^ *logging host '),
     re.compile(r'^ *flow monitor '),
     re.compile(r'^ *service-template '),
+    re.compile(r'^ *aaa group server radius '),
+    re.compile(r'^ *flow exporter '),
+    re.compile(r'^ * exporter '),
+    re.compile(r'^ *username '),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
