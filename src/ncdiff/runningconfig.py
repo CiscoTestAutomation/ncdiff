@@ -19,14 +19,37 @@ SHORT_NO_COMMANDS = [
 # Some commands are orderless, e.g., "show running-config" output could be:
 # aaa authentication login admin-con group tacacs+ local
 # aaa authentication login admin-vty group tacacs+ local
+#
 # Or in other times it is displayed in a different order:
 # aaa authentication login admin-vty group tacacs+ local
 # aaa authentication login admin-con group tacacs+ local
+#
+# Since "aaa authentication login" is orderless at the the global config
+# level, regexp and depth are defined as "^ *aaa authentication login " and 0.
+#
+# In another example, "show running-config" output could be:
+# flow monitor meraki_monitor
+#   exporter meraki_exporter
+#   exporter customer_exporter
+#   record meraki_record
+#
+# Or in other times it is displayed in a different order:
+# flow monitor meraki_monitor
+#   exporter customer_exporter
+#   exporter meraki_exporter
+#   record meraki_record
+#
+# Here the config "exporter" at the second level is orderless. so regexp and
+# depth are defined as "^ *exporter " and 1.
 ORDERLESS_COMMANDS = [
-    re.compile(r'^ *aaa authentication login '),
-    re.compile(r'^ *logging host '),
-    re.compile(r'^ *flow monitor '),
-    re.compile(r'^ *service-template '),
+    (re.compile(r'^ *aaa authentication login '), 0),
+    (re.compile(r'^ *logging host '), 0),
+    (re.compile(r'^ *flow monitor '), 0),
+    (re.compile(r'^ *service-template '), 0),
+    (re.compile(r'^ *aaa group server radius '), 0),
+    (re.compile(r'^ *flow exporter '), 0),
+    (re.compile(r'^ *exporter '), 1),
+    (re.compile(r'^ *username '), 0),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
@@ -279,7 +302,7 @@ class RunningConfigDiff(object):
                                     ' exit-address-family')
         list_1 = self.config2list(str_in_1)
         list_2 = self.config2list(str_in_2)
-        return self.handle_orderless(list_1, list_2)
+        return self.handle_orderless(list_1, list_2, 0)
 
     def config2list(self, str_in):
         list_ret = []
@@ -488,26 +511,24 @@ class RunningConfigDiff(object):
             return cmd.strip(), False
 
     @staticmethod
-    def handle_orderless(list1, list2):
+    def handle_orderless(list1, list2, depth):
         # Find common lines that are orderless
         lines1 = [i[0] for i in list1]
         matches = {}
         for idx, item in enumerate(list2):
-            result, match_type = RunningConfigDiff.match_orderless(item[0])
+            result, match_type = RunningConfigDiff.match_orderless(item[0],
+                                                                   depth)
             if result and item[0] in lines1:
                 matches[item[0]] = match_type, idx
 
         # Romove common lines from list1 and save them in removed_items
-        last_idx = 0
         type_start_idx = {}
         to_be_removed = []
         for idx, line in enumerate(lines1):
             if line in matches:
                 if matches[line][0] not in type_start_idx:
-                    type_start_idx[matches[line][0]] = last_idx + 1
+                    type_start_idx[matches[line][0]] = idx
                 to_be_removed.append(idx)
-            else:
-                last_idx = idx
         removed_items = {}
         for idx in reversed(to_be_removed):
             removed_items[list1[idx][0]] = list1[idx]
@@ -529,23 +550,35 @@ class RunningConfigDiff(object):
         previous_idx_2 = 0
         for line, (line_type, list2_idx) in matches.items():
             common_idx_1 = 0
-            for i, j in common_lines:
-                if previous_idx_2 <= j and j < list2_idx:
-                    common_idx_1 = i + 1
-                    previous_idx_2 = j
-                if j > list2_idx:
-                    break
+            if len(common_lines) > 0 and list2_idx > common_lines[0][1]:
+                for i, j in common_lines:
+                    # if previous_idx_2 <= j and j < list2_idx:
+                    if j < list2_idx:
+                        common_idx_1 = i + 1
+                        previous_idx_2 = j
+                    if j > list2_idx:
+                        break
             start_idx = max(common_idx_1 + offset_idx_1,
                             type_start_idx[line_type])
             list1.insert(start_idx, removed_items[line])
             offset_idx_1 = start_idx - common_idx_1 + 1
 
+        # Find common lines that have children
+        lines1 = {item[0]: idx for idx, item in enumerate(list1)
+                  if isinstance(item[1], list) and len(item[1]) > 0}
+        lines2 = {item[0]: idx for idx, item in enumerate(list2)
+                  if isinstance(item[1], list) and len(item[1]) > 0}
+        for line in set(lines1.keys()) & set(lines2.keys()):
+            RunningConfigDiff.handle_orderless(list1[lines1[line]][1],
+                                               list2[lines2[line]][1],
+                                               depth + 1)
+
         return list1, list2
 
     @staticmethod
-    def match_orderless(line):
-        for idx, regx in enumerate(ORDERLESS_COMMANDS):
-            if re.search(regx, line):
+    def match_orderless(line, current_depth):
+        for idx, (regx, depth) in enumerate(ORDERLESS_COMMANDS):
+            if depth == current_depth and re.search(regx, line):
                 return True, idx
         return False, None
 
