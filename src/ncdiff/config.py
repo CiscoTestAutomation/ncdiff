@@ -539,18 +539,26 @@ class ConfigDelta(object):
         config_dst. Then attribute nc will reflect what needs to be modified.
         The second option is to use 'replace' operation in Netconf. More
         customers prefer 'replace' operation as it is more deterministic.
+
+    replace_depth : `int`
+        Specify the deepest level of replace operation when diff_type is
+        'replace'. Replace operation might be needed earlier before we reach
+        the specified level, depending on situations. Consider roots in a YANG
+        module are level 0, their children are level 1, and so on so forth.
+        The default value of replace_depth is 0.
     '''
 
     def __init__(self, config_src, config_dst=None, delta=None,
                  preferred_create='merge',
                  preferred_replace='merge',
                  preferred_delete='delete',
-                 diff_type='minimum'):
+                 diff_type='minimum', replace_depth=0):
         '''
         __init__ instantiates a ConfigDelta instance.
         '''
 
         self.diff_type = diff_type
+        self.replace_depth = replace_depth
         if not isinstance(config_src, Config):
             raise TypeError("argument 'config_src' must be "
                             "yang.ncdiff.Config, but not '{}'"
@@ -599,22 +607,15 @@ class ConfigDelta(object):
 
     @property
     def nc(self):
-        if self.diff_type == 'replace':
-            return NetconfCalculator(
-                self.device,
-                self.config_dst.ele, self.config_src.ele,
-                preferred_create=self.preferred_create,
-                preferred_replace=self.preferred_replace,
-                preferred_delete=self.preferred_delete,
-                ).get_config_replace()
-        else:
-            return NetconfCalculator(
-                self.device,
-                self.config_dst.ele, self.config_src.ele,
-                preferred_create=self.preferred_create,
-                preferred_replace=self.preferred_replace,
-                preferred_delete=self.preferred_delete,
-            ).sub
+        return NetconfCalculator(
+            self.device,
+            self.config_dst.ele, self.config_src.ele,
+            preferred_create=self.preferred_create,
+            preferred_replace=self.preferred_replace,
+            preferred_delete=self.preferred_delete,
+            diff_type=self.diff_type,
+            replace_depth=self.replace_depth,
+        ).sub
 
     @property
     def ns(self):

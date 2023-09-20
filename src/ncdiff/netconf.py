@@ -140,17 +140,35 @@ class NetconfCalculator(BaseCalculator):
     preferred_delete : `str`
         Preferred operation of deleting an existing element. Choice of
         'delete' or 'remove'.
+
+    diff_type : `str`
+        Choice of 'minimum' or 'replace'. This value has impact on attribute
+        nc. In general, there are two options to construct nc. The first
+        option is to find out minimal changes between config_src and
+        config_dst. Then attribute nc will reflect what needs to be modified.
+        The second option is to use 'replace' operation in Netconf. More
+        customers prefer 'replace' operation as it is more deterministic.
+
+    replace_depth : `int`
+        Specify the deepest level of replace operation when diff_type is
+        'replace'. Replace operation might be needed earlier before we reach
+        the specified level, depending on situations. Consider roots in a YANG
+        module are level 0, their children are level 1, and so on so forth.
+        The default value of replace_depth is 0.
     '''
 
     def __init__(self, device, etree1, etree2,
                  preferred_create='merge',
                  preferred_replace='merge',
-                 preferred_delete='delete'):
+                 preferred_delete='delete',
+                 diff_type='minimum', replace_depth=0):
         '''
         __init__ instantiates a NetconfCalculator instance.
         '''
 
         BaseCalculator.__init__(self, device, etree1, etree2)
+        self.diff_type = diff_type
+        self.replace_depth = replace_depth
         if preferred_create in ['merge', 'create', 'replace']:
             self.preferred_create = preferred_create
         else:
@@ -178,10 +196,13 @@ class NetconfCalculator(BaseCalculator):
     def sub(self):
         ele1 = deepcopy(self.etree1)
         ele2 = deepcopy(self.etree2)
-        self.node_sub(ele1, ele2)
+        if self.diff_type == 'replace' and self.replace_depth == 0:
+            self.get_config_replace(ele1, ele2)
+        else:
+            self.node_sub(ele1, ele2, depth=0)
         return ele1
 
-    def get_config_replace(self):
+    def get_config_replace(self, node_self, node_other):
         '''get_config_replace
 
         High-level api: Build an edit-config using operation='replace'. It
@@ -199,9 +220,8 @@ class NetconfCalculator(BaseCalculator):
             An element represnting an edit-config.
         '''
 
-        ele = deepcopy(self.etree1)
         in_s_not_in_o, in_o_not_in_s, in_s_and_in_o = \
-            self._group_kids(ele, self.etree2)
+            self._group_kids(node_self, node_other)
         ordered_by_user = {}
 
         for child_self in in_s_not_in_o:
@@ -225,11 +245,11 @@ class NetconfCalculator(BaseCalculator):
             child_self = etree.Element(child_other.tag,
                                        {operation_tag: self.preferred_delete},
                                        nsmap=child_other.nsmap)
-            siblings = list(ele.iterchildren(tag=child_other.tag))
+            siblings = list(node_self.iterchildren(tag=child_other.tag))
             if siblings:
                 siblings[-1].addnext(child_self)
             else:
-                ele.append(child_self)
+                node_self.append(child_self)
             s_node = self.device.get_schema_node(child_other)
             if s_node.get('type') == 'leaf-list':
                 self._merge_text(child_other, child_self)
@@ -246,19 +266,19 @@ class NetconfCalculator(BaseCalculator):
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') == 'leaf':
                 if self._same_text(child_self, child_other):
-                    ele.remove(child_self)
+                    node_self.remove(child_self)
             elif s_node.get('type') == 'leaf-list':
                 if s_node.get('ordered-by') == 'user':
                     if s_node.tag not in ordered_by_user:
                         ordered_by_user[s_node.tag] = 'leaf-list'
                 else:
-                    ele.remove(child_self)
+                    node_self.remove(child_self)
             elif s_node.get('type') == 'container':
                 if (
                     self._node_le(child_self, child_other) and
                     self._node_le(child_other, child_self)
                 ):
-                    ele.remove(child_self)
+                    node_self.remove(child_self)
             elif s_node.get('type') == 'list':
                 if (
                     s_node.get('ordered-by') == 'user' and
@@ -270,7 +290,7 @@ class NetconfCalculator(BaseCalculator):
                     self._node_le(child_other, child_self)
                 ):
                     if s_node.get('ordered-by') != 'user':
-                        ele.remove(child_self)
+                        node_self.remove(child_self)
             else:
                 path = self.device.get_xpath(s_node)
                 raise ModelError("unknown schema node type: type of node {}"
@@ -278,7 +298,7 @@ class NetconfCalculator(BaseCalculator):
 
         for tag in ordered_by_user:
             scope_o = in_s_not_in_o + in_s_and_in_o
-            sequence = self._get_sequence(scope_o, tag, ele)
+            sequence = self._get_sequence(scope_o, tag, node_self)
             for i, item in enumerate(sequence):
                 # modifying the namespace mapping of a node is not possible
                 # in lxml. See https://bugs.launchpad.net/lxml/+bug/555602
@@ -303,8 +323,6 @@ class NetconfCalculator(BaseCalculator):
                             for k in keys
                         ]
                         item.set(key_tag, ''.join(id_list))
-
-        return ele
 
     def node_add(self, node_sum, node_other):
         '''node_add
@@ -882,7 +900,7 @@ class NetconfCalculator(BaseCalculator):
                                    .format(self.device.get_xpath(child_other),
                                            this_operation))
 
-    def node_sub(self, node_self, node_other):
+    def node_sub(self, node_self, node_other, depth=0):
         '''node_sub
 
         Low-level api: Compute the delta of two configs. This method is
@@ -897,6 +915,12 @@ class NetconfCalculator(BaseCalculator):
 
         node_other : `Element`
             A config node in another config tree that is being processed.
+
+        depth : `int`
+            Specify the current level of processing. In other words, how many
+            hops from node_self to roots. Consider roots in a YANG module are
+            level 0, their children are level 1, and so on so forth. The
+            default value of depth is 0.
 
         Returns
         -------
@@ -932,6 +956,8 @@ class NetconfCalculator(BaseCalculator):
                                         nsmap=child_self.nsmap)
             if self.preferred_create != 'merge':
                 child_self.set(operation_tag, self.preferred_create)
+            if self.diff_type == 'replace':
+                child_self.set(operation_tag, 'replace')
             siblings = list(node_other.iterchildren(tag=child_self.tag))
             if siblings:
                 siblings[-1].addnext(child_other)
@@ -1003,7 +1029,13 @@ class NetconfCalculator(BaseCalculator):
                     node_self.remove(child_self)
                     node_other.remove(child_other)
                 else:
-                    self.node_sub(child_self, child_other)
+                    if (
+                        self.diff_type == 'replace' and
+                        self.replace_depth == depth + 1
+                    ):
+                        self.get_config_replace(child_self, child_other)
+                    else:
+                        self.node_sub(child_self, child_other, depth=depth+1)
             elif s_node.get('type') == 'list':
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
@@ -1023,7 +1055,13 @@ class NetconfCalculator(BaseCalculator):
                         node_self.remove(child_self)
                         node_other.remove(child_other)
                 else:
-                    self.node_sub(child_self, child_other)
+                    if (
+                        self.diff_type == 'replace' and
+                        self.replace_depth == depth + 1
+                    ):
+                        child_self.set(operation_tag, 'replace')
+                    else:
+                        self.node_sub(child_self, child_other, depth=depth+1)
             else:
                 path = self.device.get_xpath(s_node)
                 raise ModelError("unknown schema node type: type of node {}"

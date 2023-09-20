@@ -995,7 +995,7 @@ class TestNcDiff(unittest.TestCase):
         config5 = config1 + delta3
         self.assertEqual(config2, config5)
 
-    def test_delta_replace(self):
+    def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
               <data>
@@ -1099,6 +1099,120 @@ class TestNcDiff(unittest.TestCase):
         self.assertEqual(store[0].get(insert_tag), 'first')
         self.assertEqual(store[0].text, 'Dollar')
         self.assertEqual(store[1].get(operation_tag), 'replace')
+        self.assertEqual(store[1].get(insert_tag), 'after')
+        self.assertEqual(store[1].get(value_tag), 'Dollar')
+        self.assertEqual(store[1].text, 'Cheap')
+        self.assertEqual(store[2].get(operation_tag), 'delete')
+        self.assertEqual(store[2].text, 'Quick')
+
+        config3 = config1 + delta
+        self.assertEqual(config2, config3)
+
+    def test_delta_replace_2(self):
+        config_xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <foo xmlns="urn:jon">abc</foo>
+                <tracking xmlns="urn:jon">
+                  <enabled>true</enabled>
+                </tracking>
+                <address xmlns="urn:jon">
+                  <last>Brown</last>
+                  <first>Bob</first>
+                  <street>Innovation</street>
+                  <city>New York</city>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Paul</last>
+                  <first>Bob</first>
+                  <street>Express</street>
+                  <city>Kanata</city>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Wang</last>
+                  <first>Ken</first>
+                  <street>Main</street>
+                  <city>Boston</city>
+                </address>
+                <store xmlns="urn:jon">Dollar</store>
+                <store xmlns="urn:jon">Cheap</store>
+                <store xmlns="urn:jon">Quick</store>
+              </data>
+            </rpc-reply>
+            """
+        config_xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <foo xmlns="urn:jon">edf</foo>
+                <tracking xmlns="urn:jon">
+                  <enabled>false</enabled>
+                </tracking>
+                <address xmlns="urn:jon">
+                  <last>Brown</last>
+                  <first>Bob</first>
+                  <street>Carp</street>
+                  <city>New York</city>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Wang</last>
+                  <first>Ken</first>
+                  <street>Second</street>
+                  <city>Boston</city>
+                </address>
+                <store xmlns="urn:jon">Dollar</store>
+                <store xmlns="urn:jon">Cheap</store>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, config_xml1)
+        config2 = Config(self.d, config_xml2)
+        delta = config2 - config1
+        delta.diff_type = 'replace'
+        delta.replace_depth = 1
+
+        # leaf foo
+        foo = delta.nc.xpath('//nc:config/jon:foo',
+                             namespaces=delta.ns)[0]
+        self.assertEqual(foo.get(operation_tag), None)
+        self.assertEqual(foo.text, 'edf')
+
+        # container tracking
+        tracking = delta.nc.xpath('//nc:config/jon:tracking',
+                                  namespaces=delta.ns)[0]
+        enabled = delta.nc.xpath('//nc:config/jon:tracking/jon:enabled',
+                                 namespaces=delta.ns)[0]
+        self.assertEqual(enabled.text, 'false')
+        self.assertEqual(enabled.get(operation_tag), 'replace')
+
+        # list address
+        address = delta.nc.xpath('//nc:config/jon:address',
+                                 namespaces=delta.ns)
+        self.assertEqual(address[0].get(operation_tag), 'replace')
+        self.assertEqual(address[0].get(insert_tag), 'first')
+        street = address[0].xpath('jon:street',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(street.text, 'Carp')
+        self.assertEqual(address[1].get(operation_tag), 'replace')
+        self.assertEqual(address[1].get(insert_tag), 'after')
+        self.assertEqual(address[1].get(key_tag),
+                         "[first='Bob'][last='Brown']")
+        street = address[1].xpath('jon:street',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(street.text, 'Second')
+        self.assertEqual(address[2].get(operation_tag), 'delete')
+        first = address[2].xpath('jon:first',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(first.text, 'Bob')
+        last = address[2].xpath('jon:last',
+                                  namespaces=delta.ns)[0]
+        self.assertEqual(last.text, 'Paul')
+
+        # leaf-list store
+        store = delta.nc.xpath('//nc:config/jon:store', namespaces=delta.ns)
+        self.assertEqual(store[0].get(operation_tag), None)
+        self.assertEqual(store[0].get(insert_tag), 'first')
+        self.assertEqual(store[0].text, 'Dollar')
+        self.assertEqual(store[1].get(operation_tag), None)
         self.assertEqual(store[1].get(insert_tag), 'after')
         self.assertEqual(store[1].get(value_tag), 'Dollar')
         self.assertEqual(store[1].text, 'Cheap')
