@@ -1222,6 +1222,91 @@ class TestNcDiff(unittest.TestCase):
         config3 = config1 + delta
         self.assertEqual(config2, config3)
 
+    def test_delta_replace_3(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <router>
+                    <bgp xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-bgp">
+                      <id>10</id>
+                      <bgp>
+                        <router-id>10.8.55.30</router-id>
+                        <log-neighbor-changes/>
+                      </bgp>
+                    </bgp>
+                  </router>
+                  <vrf>
+                    <definition>
+                      <name>Mgmt-vrf</name>
+                      <address-family>
+                        <ipv4/>
+                        <ipv6/>
+                      </address-family>
+                    </definition>
+                  </vrf>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <router>
+                    <bgp xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-bgp">
+                      <id>10</id>
+                      <bgp>
+                        <router-id>10.8.55.30</router-id>
+                        <log-neighbor-changes/>
+                        <listen>
+                          <limit>2100</limit>
+                          <range>
+                            <network-range>10.44.0.0/16</network-range>
+                            <peer-group>INET1-SPOKES</peer-group>
+                          </range>
+                        </listen>
+                      </bgp>
+                      <address-family>
+                        <no-vrf>
+                          <ipv4>
+                            <af-name>unicast</af-name>
+                          </ipv4>
+                        </no-vrf>
+                      </address-family>
+                    </bgp>
+                  </router>
+                  <vrf>
+                    <definition>
+                      <name>Mgmt-vrf</name>
+                      <address-family>
+                        <ipv4/>
+                        <ipv6/>
+                      </address-family>
+                    </definition>
+                  </vrf>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta = config2 - config1
+        delta.diff_type = 'replace'
+        delta.replace_depth = 1
+
+        # container tracking
+        router = delta.nc.xpath('//nc:config/ios:native/ios:router',
+                                namespaces=delta.ns)[0]
+        self.assertEqual(router.get(operation_tag), 'replace')
+
+        # container vrf should not exist
+        vrf = delta.nc.xpath('//nc:config/ios:native/ios:vrf',
+                             namespaces=delta.ns)
+        self.assertEqual(vrf, [])
+
     def test_xpath_1(self):
         xml = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"

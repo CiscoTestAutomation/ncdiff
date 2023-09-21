@@ -263,10 +263,12 @@ class NetconfCalculator(BaseCalculator):
 
         for child_self, child_other in in_s_and_in_o:
             child_self.set(operation_tag, 'replace')
+            child_other.set(operation_tag, 'replace')
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') == 'leaf':
                 if self._same_text(child_self, child_other):
-                    node_self.remove(child_self)
+                    if not s_node.get('is_key'):
+                        node_self.remove(child_self)
             elif s_node.get('type') == 'leaf-list':
                 if s_node.get('ordered-by') == 'user':
                     if s_node.tag not in ordered_by_user:
