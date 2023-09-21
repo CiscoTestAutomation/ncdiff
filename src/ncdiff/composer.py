@@ -212,8 +212,10 @@ class Composer(object):
                             for key in n.keys:
                                 id = self.device.convert_tag(default_ns, key,
                                                              dst=type)[1]
-                                ret += '[{}="{}"]'.format(id,
-                                                          node.find(key).text)
+                                key_node = node.find(key)
+                                if key_node is not None:
+                                    ret += '[{}="{}"]'.format(id,
+                                                              key_node.text)
             return ret
 
         nodes = list(reversed(list(self.node.iterancestors())))[1:] + \
