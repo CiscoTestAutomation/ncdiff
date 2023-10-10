@@ -1,11 +1,22 @@
 module Cisco-IOS-XE-tunnel {
+  yang-version 1.1;
   namespace "http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel";
   prefix ios-tun;
 
+  import cisco-semver {
+    prefix cisco-semver;
+  }
+  import cisco-semver-internal {
+    prefix cisco-semver-internal;
+  }
+ 
   import ietf-inet-types {
     prefix inet;
   }
 
+  import tailf-common {
+    prefix tailf;
+  }
 
   import Cisco-IOS-XE-native {
     prefix ios;
@@ -21,6 +32,14 @@ module Cisco-IOS-XE-tunnel {
 
   import Cisco-IOS-XE-features {
     prefix ios-features;
+  }
+
+  import Cisco-IOS-XE-interface-common {
+    prefix ios-ifc;
+  }
+
+  import Cisco-IOS-XE-policy {
+    prefix ios-policy;
   }
 
   organization
@@ -39,18 +58,78 @@ module Cisco-IOS-XE-tunnel {
 
   description
     "Cisco XE Native Tunnel Interfaces Yang model.
-     Copyright (c) 2016-2017 by Cisco Systems, Inc.
+     Copyright (c) 2016-2019 by Cisco Systems, Inc.
      All rights reserved.";
 
   // =========================================================================
   // REVISION
   // =========================================================================
+  revision 2022-11-01 {
+    description
+      "- Update yang-version to 1.1"; 
+      cisco-semver-internal:os-version "17.10.1";
+  }
+  revision 2022-03-01 {
+    description
+      "- added dual-overlay support for tunnel mode";
+    cisco-semver-internal:os-version "17.8.1";
+  }
+
+  revision 2021-11-01 {
+    description
+      "- Added tunnel metadata command
+       - Ipsec v4 and v6 overlay support";
+    cisco-semver-internal:os-version "17.7.1";
+  }
+
+  revision 2020-11-01 {
+    description
+      "- Initial revision for 17.4.1";
+    cisco-semver-internal:os-version "17.4.1";
+  }
+
+  revision 2020-03-01 {
+    description
+      "- Added host option for tunnel destination";
+    cisco-semver-internal:os-version "17.2.1";
+  }
+  revision 2019-11-01 {
+    description 
+      "- Added route-via config";
+    cisco-semver:module-version "1.1.0";
+    cisco-semver-internal:os-version "17.1.1";
+  }
+  revision 2019-07-01 {
+    description 
+      "- Establish semantic version baseline
+       - Tunnel VRF model condition added
+       - Enabled default values for tunnel parameters
+       - Corrected various issues with the tunnel mode
+       - Added Tunnel submode l2tpv3 under ethernet mode";
+    cisco-semver:module-version "1.0.0";
+  }
+  revision 2018-11-21 {
+      description
+      "Cleanup spelling errors in description statements";
+  }
+  revision 2018-11-09 {
+    description
+      "added support for EoGRE P2P interfaces";
+  }
+  revision 2018-08-12 {
+    description
+      "added must constraint on tunnel source on interface Dialer";
+  }
+  revision 2018-03-06 {
+    description
+      "validate ip unnumbered and tunnel source are the same for tunnel mode sdwan";
+  }
   revision 2017-08-28 {
     description
       "Extend modeling for multicast";
   }
   revision 2017-07-11 {
-    description 
+    description
       "add tailf dependency extension to order tunnel mode before tunnel key";
   }
   revision 2017-04-28 {
@@ -67,6 +146,30 @@ module Cisco-IOS-XE-tunnel {
       "Initial revision";
   }
 
+  grouping tunnel-mode-ip-ipv6-opt-grouping {
+    choice tunmode-choice {
+      leaf ip {
+        description "over IP";
+        tailf:cli-full-command;
+        type empty;
+      }
+      leaf ipv6 {
+        description "over IPv6";
+        tailf:cli-full-command;
+        type empty;
+      }
+      container multipoint {
+        description "mode Multipoint";
+        presence "true";
+        tailf:cli-reset-container;
+        leaf "ipv6" {
+          description "over IPv6 (multipoint)";
+          tailf:cli-full-command;
+          type empty;
+        }
+      }
+    }
+  }
 
   grouping config-interface-tunnel-grouping {
     container nhrp {
@@ -80,6 +183,7 @@ module Cisco-IOS-XE-tunnel {
             "Number of seconds";
           type uint8 {
             range "1..22";
+            tailf:info "<1-22>;;Number of seconds";
           }
         }
       }
@@ -95,6 +199,8 @@ module Cisco-IOS-XE-tunnel {
           description
             "NHRP group mapping";
           list nhrp-name {
+            tailf:cli-drop-node-name;
+            tailf:cli-suppress-mode;
             key "nhrp-name";
             leaf nhrp-name {
               description
@@ -116,6 +222,9 @@ module Cisco-IOS-XE-tunnel {
       leaf route-watch {
         description
           "Enable NHRP route watch";
+        tailf:cli-boolean-no;
+        tailf:cli-trim-default;
+        tailf:cli-full-command;
         type boolean;
       }
     }
@@ -125,25 +234,40 @@ module Cisco-IOS-XE-tunnel {
         "protocol-over-protocol tunneling";
       // interface * / tunnel 6rd
       container tun-6rd {
+        when "../ios-tun:mode/ios-tun:ipv6ip-config/ios-tun:auto-6rd";
+        tailf:alt-name "6rd";
+        tailf:cli-diff-delete-before "../mode";
+        tailf:cli-diff-create-after "../mode";
+        tailf:cli-delete-when-empty;
         description
           "set tunnel 6rd parameters";
         leaf br {
           description
             "Border Relay parameters";
           type inet:ipv4-address;
+          tailf:cli-full-command;
         }
         container ipv4 {
           description
             "Common IPv4 transport source parameters";
+          tailf:cli-delete-when-empty;
+          tailf:cli-compact-syntax;
+          tailf:cli-full-no;
           leaf prefix-len {
             description
               "Common IPv4 transport source prefix length";
-            type uint8;
+            type uint8 {
+              range "0..31";
+              tailf:info "<0-31>;;Length in number of bits";
+            }
           }
           leaf suffix-len {
             description
               "Common IPv4 transport source suffix length";
-            type uint8;
+            type uint8 {
+              range "0..31";
+              tailf:info "<0-31>;;Length in number of bits";
+            }
           }
         }
         leaf prefix {
@@ -151,13 +275,37 @@ module Cisco-IOS-XE-tunnel {
             "Provider selected common IPv6 prefix";
           type ios-types:ipv6-prefix;
         }
+        leaf reverse-map-check-config {
+          description
+            "Enable source IP address and port verification";
+          tailf:alt-name "reverse-map-check";
+          tailf:cli-boolean-no;
+          tailf:cli-full-command;
+          type boolean;
+          default "true";
+        }
         leaf reverse-map-check {
           description
             "Enable source IP address and port verification";
+          status deprecated;
+          tailf:hidden deprecated;
+          tailf:cli-ignore-modified;
+          tailf:cli-full-command;
           type empty;
         }
       }
 
+
+      // interface * / tunnel src-mac-address
+      leaf src-mac-address {
+        description
+          "Mac address";
+        when "../ios-tun:mode/ios-tun:ethernet-config";
+        tailf:cli-full-command;
+        type ios-types:cisco-mac-address-type {
+          tailf:info "H.H.H;; Source MAC address";
+        }
+      }
       // interface * / tunnel bandwidth
       container bandwidth {
         description
@@ -165,12 +313,24 @@ module Cisco-IOS-XE-tunnel {
         leaf receive {
           description
             "Receive bandwidth";
-          type uint32;
+          tailf:cli-full-command;
+          type uint32 {
+            range "1..10000000";
+            tailf:info "<1-10000000>;;Bandwidth in kilobits";
+          }
+          default "8000";
+          tailf:cli-trim-default;
         }
         leaf transmit {
           description
             "Transmit bandwidth";
-          type uint32;
+          tailf:cli-full-command;
+          type uint32 {
+            range "1..10000000";
+            tailf:info "<1-10000000>;;Bandwidth in kilobits";
+          }
+          default "8000";
+          tailf:cli-trim-default;
         }
       }
 
@@ -178,35 +338,99 @@ module Cisco-IOS-XE-tunnel {
       leaf checksum {
         description
           "enable end to end checksumming of packets";
-        type empty;
+          tailf:cli-full-command;
+          type empty;
       }
 
       // interface * / tunnel source
       leaf source {
         description
           "source of tunnel packets";
+        must "starts-with(., 'Dialer') and "
+             + " (number(substring-after(., 'Dialer')) = /ios:native/ios:interface/ios:Dialer/ios:name)"
+             + " or not (starts-with(., 'Dialer'))" {
+             error-message "To use a Dialer interface, the Dialer interface has to be configured 1st, vice versa for delete";
+        }
         type string;
       }
 
       // interface * / tunnel destination
+      container destination-config {
+        description
+          "destination of tunnel";
+        tailf:alt-name "destination";
+        choice dest-choice {
+          leaf ipv4 {
+            description "ip address or host name";
+            tailf:cli-full-command;
+            tailf:cli-drop-node-name;
+            must "not (../../ios-tun:mode/ios-tun:gre-config/ios-tun:multipoint)
+                  and not (../../ios-tun:mode/ios-tun:ipv6ip-config/ios-tun:auto-6rd)
+                  and not (../../ios-tun:mode/ios-tun:ipv6ip-config/ios-tun:auto-6to4)
+                  and not (../../ios-tun:mode/ios-tun:ipv6ip-config/ios-tun:auto-isatap)" {
+              error-message "tunnel destination and this mode cannot be configured together.";
+            }
+            type inet:ipv4-address{
+              tailf:info "A.B.C.D;;Destination address";
+            }
+          }
+          leaf ipv6 {
+            description "IPv6 address";
+            tailf:cli-full-command;
+            tailf:cli-drop-node-name;
+            type inet:ipv6-address {
+              tailf:info "X:X:X:X::X;;IPv6 address";
+            }
+          }
+          leaf "dynamic" {
+            description "destination dynamic";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf host {
+            description "host name";
+            tailf:cli-drop-node-name;
+            type string;
+          }
+        }
+      }
       container destination {
         description
           "destination of tunnel";
+        status deprecated;
+        tailf:hidden deprecated;
+        tailf:cli-ignore-modified;
         leaf ipaddress-or-host {
+          status deprecated;
+          tailf:hidden deprecated;
+          tailf:cli-ignore-modified;
+          tailf:cli-drop-node-name;
           type inet:host;
         }
         container list {
           description
             "List of Tunnel destinations";
+          status deprecated;
+          tailf:hidden deprecated;
+          tailf:cli-ignore-modified;
           container mpls {
             description
               "MPLS destination list";
+            status deprecated;
+            tailf:hidden deprecated;
+            tailf:cli-ignore-modified;
               container traffic-eng {
                 description
                   "MPLS Traffic Engineering destination list";
+                status deprecated;
+                tailf:hidden deprecated;
+                tailf:cli-ignore-modified;
                 leaf name {
                   description
                     "Specify a destination list by name";
+                  status deprecated;
+                  tailf:hidden deprecated;
+                  tailf:cli-ignore-modified;
                   type string;
                 }
               }
@@ -214,14 +438,22 @@ module Cisco-IOS-XE-tunnel {
          }
       }
 
+
       // interface * / tunnel dst-port
       container dst-port {
         description
           "tunnel destination port";
+        when "../ios-tun:mode/ios-tun:udp-config";
+        tailf:cli-diff-delete-before "../ios-tun:mode/ios-tun:udp-config";
+        tailf:cli-diff-create-after "../ios-tun:mode/ios-tun:udp-config";
         choice dst-port-choice {
           case port-num-case {
             leaf port-num {
-              type uint16;
+              tailf:cli-drop-node-name;
+              type uint16 {
+                range "0..65535";
+                tailf:info "<0-65535>;;tunnel destination port number";
+              }
             }
           }
           case dynamic-case {
@@ -244,6 +476,9 @@ module Cisco-IOS-XE-tunnel {
           leaf output {
             description
               "apply QoS service policy in the output direction";
+            must "(/ios:native/ios:policy/ios-policy:policy-map[ios-policy:name = current()])" {
+              error-message "Warning: This control policy-map does not exist";
+            }
             type string;
           }
         }
@@ -253,6 +488,12 @@ module Cisco-IOS-XE-tunnel {
       leaf entropy {
         description
           "Compute hash (entropy) on payload and propagate to tunnel header";
+        tailf:cli-full-command;
+        must "((../ios-tun:mode/ios-tun:gre-config)
+              or (../ios-tun:mode/ios-tun:ethernet-config/ios-tun:gre/ios-tun:ipv4)
+              or (../ios-tun:mode/ios-tun:ethernet-config/ios-tun:gre/ios-tun:ipv6))" {
+          error-message "Tunnel entropy and this tunnel mode are not allowed.";
+        }
         type empty;
       }
 
@@ -282,30 +523,100 @@ module Cisco-IOS-XE-tunnel {
       leaf key {
         description
           "security or selector key";
+        tailf:cli-diff-delete-before "../mode";
+        tailf:cli-diff-create-after "../mode";
+        tailf:cli-full-command;
         type uint64 {
           range "0..4294967295";
+          tailf:info "<0-4294967295>;;key";
         }
       }
+
       // interface * / tunnel mode
       container mode {
         description
           "tunnel encapsulation method";
+        tailf:cli-full-no;
         choice mode-choice {
-          // interface * / tunnel mode ipsec
+          // interface * / tunnel mode aurp
+          leaf aurp {
+            description
+              "AURP TunnelTalk AppleTalk encapsulation";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf cayman {
+            description
+              "Cayman TunnelTalk AppleTalk encapsulation";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf dvmrp {
+            description
+              "DVMRP multicast tunnel";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf eon {
+            description
+              "EON compatible CLNS tunnel";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf iptalk {
+            description
+              "Apple IPTalk encapsulation";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf nos {
+            description
+              "IP over IP encapsulation (KA9Q/NOS compatible)";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf rbscp {
+            description
+              "RBSCP in IP tunnel";
+            tailf:cli-full-command;
+            type empty;
+          }
+          leaf tag-switching {
+            description
+              "IP over Tag Switching encapsulation";
+            tailf:cli-full-command;
+            type empty;
+          }
           container ipsec {
             description
               "IPSec tunnel encapsulation";
+            tailf:cli-reset-container;
             container ipv4 {
               description
                 "over IPv4";
+              tailf:cli-delete-when-empty;
               presence "true";
+              leaf v6-overlay {
+                type empty;
+              }
             }
             container ipv6 {
               description
                 "over IPv6";
+              tailf:cli-delete-when-empty;
               presence "true";
+              leaf v4-overlay {
+                type empty;
+              }
+            }
+            leaf dual-overlay {
+              description
+                "over dual-overlay";
+              tailf:cli-full-command;
+              type empty;
             }
           }
+
           // interface * / tunnel mode mpls
           container mpls {
             description
@@ -313,6 +624,7 @@ module Cisco-IOS-XE-tunnel {
             container traffic-eng {
               description
                 "Traffic engineering tunnels";
+              tailf:cli-delete-when-empty;
               presence "true";
               leaf multilsp {
                 description
@@ -327,30 +639,227 @@ module Cisco-IOS-XE-tunnel {
             }
           }
           // interface * / tunnel mode ethernet
-          container ethernet {
+          container ethernet-config {
             description
               "Ethernet over gre";
-            leaf gre {
-              description
-                "Ethernet over gre";
-              type enumeration {
-                enum "ipv4";
-                enum "ipv6";
+            tailf:alt-name "ethernet";
+            choice eth-mode-choice {
+              container gre {
+                description "Ethernet over GRE";
+                choice address-family-choice {
+                  container ipv4 {
+                    description "over ipv4";
+                    presence "true";
+                    tailf:cli-reset-container;
+                    leaf "p2p" {
+                      description "point-to-point over ipv4";
+                      tailf:cli-full-command;
+                      type empty;
+                    }
+                  }
+                  container ipv6 {
+                    description "over ipv6";
+                    presence "true";
+                    tailf:cli-reset-container;
+                    leaf "p2p" {
+                      description "point-to-point over ipv6";
+                      tailf:cli-full-command;
+                      type empty;
+                    }
+                  }
+                }
+              }
+              container l2tpv3 {
+                description "Use L2TPv3 encapsulation";
+                leaf "manual" {
+                  description "Manually configure L2TP parameters";
+                  tailf:cli-full-command;
+                  type empty;
+                }
               }
             }
           }
+          container ethernet {
+            description
+              "Ethernet over gre";
+            status deprecated;
+            tailf:hidden deprecated;
+            tailf:cli-ignore-modified;
+            container gre {
+              description
+                "Ethernet over gre";
+              status deprecated;
+              tailf:hidden deprecated;
+              tailf:cli-ignore-modified;
+              container ipv4 {
+                description "Ethernet over GRE ipv4";
+                status deprecated;
+                tailf:hidden deprecated;
+                tailf:cli-ignore-modified;
+                tailf:cli-delete-when-empty;
+                presence "true";
+                leaf "p2p" {
+                    must "count(/ios:native/ios:interface/ios:Tunnel/tunnel/mode/ethernet/gre/ipv4/p2p) + count (/ios:native/ios:interface/ios:Tunnel/tunnel/mode/ethernet/gre/ipv6/p2p) <= 10" {
+                        error-message "Too many EoGRE P2P interfaces";
+                    }
+                    description "point-to-point over ipv4";
+                    status deprecated;
+                    tailf:hidden deprecated;
+                    tailf:cli-ignore-modified;
+                    tailf:cli-full-command;
+                    type empty;
+                }
+              }
+              container ipv6 {
+                description "Ethernet over GRE ipv6";
+                presence "true";
+                status deprecated;
+                tailf:hidden deprecated;
+                tailf:cli-ignore-modified;
+                leaf "p2p" {
+                    must "count(/ios:native/ios:interface/ios:Tunnel/tunnel/mode/ethernet/gre/ipv4/p2p) + count (/ios:native/ios:interface/ios:Tunnel/tunnel/mode/ethernet/gre/ipv6/p2p) <= 10" {
+                        error-message "Too many EoGRE P2P interfaces";
+                    }
+                    description "point-to-point over ipv6";
+                    status deprecated;
+                    tailf:hidden deprecated;
+                    tailf:cli-ignore-modified;
+                    tailf:cli-full-command;
+                    type empty;
+                }
+              }
+            }
+          }
+          // interface * / tunnel mode ipip
+          container ipip {
+            description
+              "IP over IP encapsulation";
+            presence "true";
+            tailf:cli-reset-container;
+            tailf:cli-compact-syntax;
+            tailf:cli-sequence-commands {
+              tailf:cli-reset-all-siblings;
+            }
+            leaf decapsulate-any {
+              description
+                "Incoming traffic only";
+              tailf:cli-full-command;
+              type empty;
+            }
+          }
+          // interface * / tunnel mode ipv6
+          leaf ipv6 {
+            description
+              "Generic packet tunneling in IPv6";
+            tailf:cli-full-command;
+            type empty;
+          }
+          // interface * / tunnel mode ipv6ip
+          container ipv6ip-config {
+            description
+              "IPv6 over IP encapsulation";
+            tailf:alt-name "ipv6ip";
+            presence "true";
+            tailf:cli-reset-container;
+            choice ipv6ip-choice {
+              leaf auto-6rd {
+                tailf:alt-name "6rd";
+                description
+                  "IPv6 automatic tunnelling using 6rd";
+                tailf:cli-full-command;
+                type empty;
+              }
+              leaf auto-6to4 {
+                tailf:alt-name "6to4";
+                description
+                  "IPv6 automatic tunnelling using 6to4";
+                tailf:cli-full-command;
+                type empty;
+              }
+              leaf auto-isatap {
+                tailf:alt-name "isatap";
+                description
+                  "IPv6 automatic tunnelling using ISATAP";
+                tailf:cli-full-command;
+                type empty;
+              }
+            }
+          }
+          container ipv6ip {
+            description
+              "IPv6 over IP encapsulation";
+            status deprecated;
+            tailf:hidden deprecated;
+            tailf:cli-ignore-modified;
+            presence "true";
+            leaf auto-6rd {
+              tailf:alt-name "6rd";
+              description
+                "IPv6 automatic tunnelling using 6rd";
+              tailf:cli-full-command;
+              type empty;
+            }
+            leaf auto-6to4 {
+              tailf:alt-name "6to4";
+              description
+                "IPv6 automatic tunnelling using 6to4";
+              tailf:cli-full-command;
+              type empty;
+            }
+            leaf isatap {
+              description
+                "IPv6 automatic tunnelling using ISATAP";
+              tailf:cli-full-command;
+              type empty;
+            }
+          }
           // interface * / tunnel mode gre
+          container gre-config {
+            description
+              "generic route encapsulation protocol";
+            tailf:alt-name "gre";
+            choice tunmode-choice {
+              leaf ip {
+                description "over IP";
+                tailf:cli-full-command;
+                tailf:cli-boolean-no;
+                type boolean;
+                default "true";
+                tailf:cli-trim-default;
+              }
+              leaf ipv6 {
+                description "over IPv6";
+                tailf:cli-full-command;
+                type empty;
+              }
+              container multipoint {
+                description "mode Multipoint";
+                presence "true";
+                tailf:cli-reset-container;
+                leaf "ipv6" {
+                  description "over IPv6 (multipoint)";
+                  tailf:cli-full-command;
+                  type empty;
+                }
+              }
+            }
+          }
           container gre {
             description
               "generic route encapsulation protocol";
+            status deprecated;
+            tailf:hidden deprecated;
+            tailf:cli-ignore-modified;
             leaf ip {
               description
                 "over IP";
+              tailf:cli-full-command;
               type empty;
             }
             leaf ipv6 {
               description
                 "over IPv6";
+              tailf:cli-full-command;
               type empty;
             }
             container multipoint {
@@ -360,93 +869,284 @@ module Cisco-IOS-XE-tunnel {
               leaf ipv6 {
                 description
                   "over IPv6";
+                tailf:cli-full-command;
                 type empty;
               }
             }
           }
-          // interface * / tunnel mode ipip
-          container ipip {
-            description
-              "IP over IP encapsulation";
-            presence "true";
-            leaf decapsulate-any {
-              description
-                "Incoming traffic only";
-              type empty;
-            }
-          }
-          // interface * / tunnel mode ipv6
-          leaf ipv6 {
-            description
-              "Generic packet tunneling in IPv6";
-            type empty;
-          }
-          // interface * / tunnel mode ipv6ip
-          container ipv6ip {
-            description
-              "IPv6 over IP encapsulation";
-            presence "true";
-            leaf auto-6rd {
-              description
-                "IPv6 automatic tunnelling using 6rd";
-              type empty;
-            }
-            leaf auto-6to4 {
-              description
-                "IPv6 automatic tunnelling using 6to4";
-              type empty;
-            }
-            leaf isatap {
-              description
-                "IPv6 automatic tunnelling using ISATAP";
-              type empty;
-            }
-          }
           // interface * / tunnel mode udp
+          container udp-config {
+            description
+              "UDP encapsulation protocol";
+            tailf:alt-name "udp";
+            uses tunnel-mode-ip-ipv6-opt-grouping;
+          }
           leaf udp {
             description
               "UDP encapsulation protocol";
+            status deprecated;
+            tailf:hidden deprecated;
+            tailf:cli-ignore-modified;
             type enumeration {
               enum "ip";
               enum "multipoint";
             }
           }
+          // interface * / tunnel mode vxlan
+          container vxlan {
+            description
+              "VXLAN encapsulation";
+            choice tunmode-choice {
+              container ipv4 {
+                description "over ip";
+                choice tun-ip-vxlan-choice {
+                  leaf default-mac {
+                    description
+                      "default mac";
+                    tailf:cli-full-command;
+                    tailf:cli-delete-container-on-delete;
+                    type empty;
+                  }
+                  container src-mac {
+                    description
+                      "Source Mac address";
+                    tailf:cli-drop-node-name;
+                    tailf:cli-compact-syntax;
+                    tailf:cli-sequence-commands;
+                    leaf source-mac {
+                      description
+                        "Source Mac address";
+                      tailf:cli-drop-node-name;
+                      tailf:cli-incomplete-command;
+                      tailf:cli-delete-container-on-delete;
+                      type ios-types:cisco-mac-address-type {
+                        tailf:info "H.H.H;; Source MAC address";
+                      }
+                    }
+                    leaf dst-mac {
+                      description
+                        "Destination Mac address";
+                      tailf:cli-drop-node-name;
+                      tailf:cli-delete-container-on-delete;
+                      must "../ios-tun:source-mac" {
+                        error-message "Delete src-mac and dest-mac together";
+                      }
+                      type ios-types:cisco-mac-address-type {
+                        tailf:info "H.H.H;; Destination MAC address";
+                      }
+                    }
+                  }
+                }
+              }
+              container ipv6 {
+                description "over IPv6";
+                choice tun-ip-vxlan-choice {
+                  leaf default-mac {
+                    description
+                      "default mac";
+                    tailf:cli-full-command;
+                    tailf:cli-delete-container-on-delete;
+                    type empty;
+                  }
+                  container src-mac {
+                    description
+                      "Source Mac address";
+                    tailf:cli-drop-node-name;
+                    tailf:cli-compact-syntax;
+                    tailf:cli-sequence-commands;
+                    leaf source-mac {
+                      description
+                        "Source Mac address";
+                      tailf:cli-drop-node-name;
+                      tailf:cli-incomplete-command;
+                      tailf:cli-delete-container-on-delete;
+                      type ios-types:cisco-mac-address-type {
+                        tailf:info "H.H.H;; Source MAC address";
+                      }
+                    }
+                    leaf dst-mac {
+                      description
+                        "Destination Mac address";
+                      tailf:cli-drop-node-name;
+                      tailf:cli-delete-container-on-delete;
+                      type ios-types:cisco-mac-address-type {
+                        tailf:info "H.H.H;; Destination MAC address";
+                      }
+                    }
+                  }
+                }
+              }
+              container multipoint {
+                choice tunmode-mul-choice {
+                  leaf "ip" {
+                    description "over IPv4 (multipoint)";
+                    tailf:cli-full-command;
+                    tailf:cli-delete-container-on-delete;
+                    tailf:cli-drop-node-name;
+                    type empty;
+                  }
+                  leaf "ipv6" {
+                    description "over IPv6 (multipoint)";
+                    tailf:cli-full-command;
+                    tailf:cli-delete-container-on-delete;
+                    type empty;
+                  }
+                }
+              }
+            }
+          }
+          // interface * / tunnel mode vxlan-gpe
+          container vxlan-gpe {
+            description
+              "VXLAN gpe encapsulation";
+            choice tunmode-choice {
+              leaf ipv4 {
+                description "over ip";
+                tailf:cli-full-command;
+                tailf:cli-delete-container-on-delete;
+                type empty;
+              }
+              leaf ipv6 {
+                description "over IPv6";
+                tailf:cli-full-command;
+                tailf:cli-delete-container-on-delete;
+                type empty;
+              }
+              container multipoint {
+                choice tunmode-mul-choice {
+                  leaf "ip" {
+                    description "over IPv4 (multipoint)";
+                    tailf:cli-full-command;
+                    tailf:cli-drop-node-name;
+                    tailf:cli-delete-container-on-delete;
+                    type empty;
+                  }
+                  leaf "ipv6" {
+                    description "over IPv6 (multipoint)";
+                    tailf:cli-full-command;
+                    tailf:cli-delete-container-on-delete;
+                    type empty;
+                  }
+                }
+              }
+            }
+          }
+          // interface * / tunnel mode sdwan
+          leaf sdwan {
+          if-feature ios-features:sdwan;
+            description
+              "SDWAN";
+            tailf:cli-full-command;
+            must "../../source = /ios:native/ios:interface/ios:Tunnel/ios:ip/ios:unnumbered" {
+              error-message "ip unnumbered and tunnel source are not same for tunnel mode sdwan";
+            }
+            tailf:cli-diff-delete-before "../../source";
+            tailf:cli-diff-create-after "../../source";
+            type empty;
+          }
         }
       }
+
       // interface * / tunnel network-id
       container network-id {
         description
           "Set network-id";
+        tailf:cli-compact-syntax;
+        tailf:cli-delete-when-empty;
+        tailf:cli-reset-container;
+        tailf:cli-incomplete-command;
+        tailf:cli-sequence-commands {
+          tailf:cli-reset-all-siblings;
+        }
         leaf id {
-          type uint16;
+          description
+            "Set network-id";
+          tailf:cli-incomplete-command;
+          tailf:cli-delete-container-on-delete;
+          tailf:cli-drop-node-name;
+          must "../ios-tun:nexthop" {
+            error-message "Delete network-id and nexthop together";
+          }
+          type uint16 {
+            range "1..65535";
+            tailf:info "<1-65535>;;network id";
+          }
         }
         leaf nexthop {
           description
             "nexthop";
+          must "../ios-tun:id" {
+            error-message "Delete nexthop and network-id value together";
+          }
           type inet:ipv4-address;
-        }
-        leaf qos {
-          description
-            "QoS profile";
-          type string;
         }
         leaf weight {
           description
             "weight";
-          type uint16;
+          tailf:cli-optional-in-sequence;
+          must "../ios-tun:nexthop" {
+            error-message "Delete weight with the network-id deletion";
+          }
+          type uint16 {
+            range "1..65535";
+            tailf:info "<1-65535>;;weight";
+          }
+        }
+        leaf qos {
+          description
+            "QoS profile";
+          must "../ios-tun:nexthop" {
+            error-message "Delete QoS profile first with the network-id deletion";
+          }
+          type string;
         }
       }
+
       // interface * / tunnel path-mtu-discovery
       container path-mtu-discovery {
         description
           "Enable Path MTU Discovery on tunnel";
         presence "true";
+        tailf:cli-delete-when-empty;
+        tailf:cli-display-separated;
+        leaf age-timer {
+          description
+            "Set PMTUD aging timer";
+          tailf:cli-full-command;
+          type union {
+            type uint8 {
+              range "10..30";
+              tailf:info "<10-30>;;Aging time";
+            }
+            type enumeration {
+              enum "infinite";
+            }
+          }
+        }
+        leaf min-mtu {
+          description
+            "Min pmtud mtu allowed";
+          tailf:cli-full-command;
+          type uint16 {
+            range "92..65535";
+            tailf:info "<92-65535>;;Bytes";
+          }
+        }
       }
+
       // interface * / tunnel protection
       container protection {
         description
           "Enable tunnel protection";
         // @mount Cisco-IOS-XE-crypto
+      }
+
+      // interface * / tunnel tsp-hop
+      leaf tsp-hop {
+        description
+          "Define a TSP hop";
+        tailf:cli-full-command;
+        type empty;
       }
       // interface * / tunnel mpls
       container mpls {
@@ -454,9 +1154,28 @@ module Cisco-IOS-XE-tunnel {
       }
 
       // interface * / tunnel raw-packet-interface
+      container raw-packet-interface-config {
+        description
+          "physical interface for all packets entering into be tunneled and for all packets entering the tunnel to exit";
+        tailf:alt-name "raw-packet-interface";
+        tailf:cli-compact-syntax;
+        tailf:cli-sequence-commands;
+        uses ios-ifc:interface-grouping;
+      }
+
       leaf raw-packet-interface {
         description
-          "physical interface for all packets entering itto be tunneled and for all packets entering the tunnel to exit";
+          "physical interface for all packets entering into be tunneled and for all packets entering the tunnel to exit";
+        status deprecated;
+        tailf:hidden deprecated;
+        tailf:cli-ignore-modified;
+        type string;
+      }
+
+      // interface * / tunnel rrr
+      leaf rrr {
+        description
+          "RRR configuration";
         type string;
       }
 
@@ -467,58 +1186,148 @@ module Cisco-IOS-XE-tunnel {
         leaf ack-split {
           description
             "ACK splitting";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type uint8 {
             range "1..32";
+            tailf:info "<1-32>;;Split number";
           }
         }
         leaf delay {
           description
             "enable delay";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type empty;
+        }
+        leaf drop-scale {
+          description
+            "Drop scale";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
+          type uint8 {
+            range "1..255";
+            tailf:info "<1-255>;;Drop scale";
+          }
+        }
+        leaf fuzz {
+          description
+            "Fuzz factor";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
+          type uint8 {
+            range "1..255";
+            tailf:info "<1-255>;;Fuzz factor";
+          }
+        }
+        leaf init-tsn {
+          description
+            "Initial TSN";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
+          type uint32 {
+            range "1..16777215";
+            tailf:info "<1-16777215>;;Initial TSN";
+          }
         }
         leaf input-drop {
           description
             "max tunnel queue size (number of bw*delay)";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type uint8 {
             range "1..10";
+            tailf:info "<1-10>;;Number of bw*delay products";
           }
         }
         leaf long-drop {
           description
             "Drop non-transmitted packets w/excessive delay";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
+          type empty;
+        }
+        leaf order {
+          description
+            "release packets in order";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type empty;
         }
         leaf report {
           description
             "enable SCTP report chunk";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
+          type empty;
+        }
+        leaf scaling {
+          description
+            "ACK split scaling";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type empty;
         }
         leaf window-stuff {
           description
             "Window stuffing";
+          tailf:cli-full-command;
+          must "../../ios-tun:mode/ios-tun:rbscp" {
+            error-message "Only valid in tunnel rbscp mode";
+          }
           type uint8 {
             range "1..20";
+            tailf:info "<1-20>;;Window step up size";
           }
         }
       }
 
-      // interface * / tunnel snooping
+       // interface * / tunnel snooping
       leaf snooping {
         description
           "Snooping on tunnel";
+        tailf:cli-full-command;
+        when "../ios-tun:mode/ios-tun:ethernet-config";
         type enumeration {
           enum "enable";
         }
       }
 
-      // interface * / tunnel src-port
+     // interface * / tunnel src-port
       container src-port {
         description
           "tunnel source port";
+        when "../ios-tun:mode/ios-tun:udp-config";
+        tailf:cli-diff-delete-before "../ios-tun:mode/ios-tun:udp-config";
+        tailf:cli-diff-create-after "../ios-tun:mode/ios-tun:udp-config";
         choice src-port-choice {
           case port-num-case {
             leaf port-num {
-              type uint16;
+              tailf:cli-drop-node-name;
+              type uint16 {
+                range "0..65535";
+                tailf:info "<0-65535>;;Tunnel Source port number";
+              }
             }
           }
           case dynamic-case {
@@ -534,21 +1343,71 @@ module Cisco-IOS-XE-tunnel {
       // interface * / tunnel tos
       leaf tos {
         description
-          "set type of sevice byte";
-        type uint8;
+          "set type of service byte";
+        tailf:cli-full-command;
+        type uint8 {
+          range "0..255";
+          tailf:info "<0-255>;;tos";
+        }
+      }
+
+      // interface * / tunnel metadata
+      container metadata {
+        description
+          "metadata sharing options";
+        leaf src_vpn {
+          description
+            "enable metadata sharing src-vpn";
+          type empty;
+        }
       }
 
       // interface * / tunnel ttl
       leaf ttl {
         description
           "set time to live";
-        type uint8;
+        tailf:cli-full-command;
+        type uint8 {
+          range "1..255";
+          tailf:info "<1-255>;;ttl";
+        }
+        default "255";
+        tailf:cli-trim-default;
       }
 
       // interface * / tunnel udlr
+      container udlr-config {
+        description
+          "associate tunnel with unidirectional interface";
+        tailf:alt-name "udlr";
+        leaf address-resolution {
+          description
+            "Enable ARP and NHRP over a UDLR Tunnel";
+          tailf:cli-full-command;
+          must "(../ios-tun:send-only)" {
+            error-message "UDL Tunnel ARP is for transmit-only tunnel interfaces";
+          }
+          type empty;
+        }
+        choice udlr-choice {
+          container receive-only {
+            description
+              "Tunnel is receive-only capable";
+            uses ios-ifc:interface-grouping;
+          }
+          container send-only {
+            description
+              "Tunnel is send-only capable";
+            uses ios-ifc:interface-grouping;
+          }
+        }
+      }
       container udlr {
         description
           "associate tunnel with unidirectional interface";
+         status deprecated;
+        tailf:hidden deprecated;
+        tailf:cli-ignore-modified;
         leaf address-resolution {
           description
             "Enable ARP and NHRP over a UDLR Tunnel";
@@ -566,26 +1425,226 @@ module Cisco-IOS-XE-tunnel {
         }
       }
 
-      // interface * / tunnel vlan
-      container vlan {
-        description
-          "Set vlan-id for ethernet over gre mode";
-        leaf id1 {
-          type uint16;
+      // interface * / tunnel vxlan
+      container vxlan {
+        description "Tunnel vxlan network";
+        tailf:cli-compact-syntax;
+        when "../ios-tun:mode/ios-tun:vxlan";
+        leaf vni {
+          description
+            "Tunnel vxlan network identifier";
+          tailf:cli-full-command;
+          type uint32 {
+            range "1..16777215";
+            tailf:info "<1-16777215>;;Tunnel vxlan network identifier number";
+          }
         }
-        leaf hyphen {
-          type empty;
-        }
-        leaf id2 {
-          type uint16;
+        container src-port-range {
+          description
+            "Tunnel vxlan source port range";
+          tailf:cli-drop-node-name;
+          tailf:cli-compact-syntax;
+          tailf:cli-sequence-commands {
+            tailf:cli-reset-all-siblings;
+          }
+          leaf source-port-range {
+            description
+              "Tunnel vxlan source port number start";
+            tailf:cli-incomplete-command;
+            type uint16 {
+              range "1..65535";
+              tailf:info "<1-65535>;;Tunnel vxlan source port number start";
+            }
+          }
+          leaf source-port-end {
+            description
+              "Tunnel vxlan source port number end";
+            tailf:cli-drop-node-name;
+            tailf:cli-full-command;
+            type uint16 {
+              range "1..65535";
+              tailf:info "<1-65535>;;Tunnel vxlan source port number end";
+            }
+          }
         }
       }
 
+     // interface * / tunnel vlan
+      container vlan {
+        description
+          "Set vlan-id for ethernet over gre mode";
+        when "../ios-tun:mode/ios-tun:ethernet-config";
+        tailf:cli-compact-syntax;
+        tailf:cli-sequence-commands;
+        leaf id1 {
+          tailf:cli-drop-node-name;
+          type uint16 {
+            range "1..4094";
+            tailf:info "<1-4094>;;vlan-id";
+          }
+        }
+        leaf hyphen {
+          tailf:alt-name "-";
+          tailf:cli-break-sequence-commands;
+          type empty;
+        }
+        leaf id2 {
+          tailf:cli-drop-node-name;
+          type uint16 {
+            range "1..4094";
+            tailf:info "<1-4094>;;vlan-id";
+          }
+        }
+      }
       // interface * / tunnel vrf
+      container vrf-config {
+        description "set tunnel vrf membership";
+        tailf:alt-name "vrf";
+        tailf:cli-compact-syntax;
+        leaf multiplexing {
+          description
+            "multiple vrf's multiplexing";
+          tailf:cli-full-command;
+          type empty;
+          must "not (../vrf-common/vrf)" {
+            error-message "common vrf configured already. Remove it and then try again";
+          }
+          must "not (../vrf-egress/vrf) and not (../vrf-ingress/vrf)" {
+            error-message "egress-only ingress-only vrf configured already. Remove it and then try again";
+          }
+        }
+        container vrf-common {
+          description "vrf common config";
+          tailf:cli-drop-node-name;
+          leaf vrf {
+            tailf:cli-full-command;
+            tailf:cli-drop-node-name;
+            type string;
+            tailf:cli-diff-delete-before "/ios:native/ios:interface/ios:Tunnel/ios-tun:tunnel/ios-tun:vrf-config/ios-tun:multiplexing";
+            tailf:cli-diff-delete-before "/ios:native/ios:vrf/ios:definition/ios:name" {
+              tailf:cli-when-target-delete;
+            }
+            tailf:cli-diff-delete-before "/ios:native/ios:ip/ios:vrf/ios:name" {
+              tailf:cli-when-target-delete;
+            }
+            tailf:cli-diff-create-after "/ios:native/ios:vrf/ios:definition/ios:name" {
+              tailf:cli-when-target-set;
+            }
+            tailf:cli-diff-create-after "/ios:native/ios:ip/ios:vrf/ios:name" {
+              tailf:cli-when-target-set;
+            }
+            must "/ios:native/ios:vrf/ios:definition[ios:name=current()]
+                  or /ios:native/ios:ip/ios:vrf[ios:name=current()]" {
+              error-message "VRF is not configured";
+            }
+            must "not (../../vrf-egress/vrf) and not (../../vrf-ingress/vrf)" {
+              error-message "egress-only ingress-only vrf configured already. Remove it and then try again";
+            }
+            must "not (../../multiplexing)" {
+              error-message "vrf multiplexing configured already. Remove it and then try again";
+            }
+          }
+        }
+        container vrf-egress {
+          description "egress-only";
+          tailf:cli-drop-node-name;
+          tailf:cli-sequence-commands;
+          tailf:cli-compact-syntax;
+          leaf vrf {
+            tailf:cli-drop-node-name;
+            type string;
+            must "not (../../vrf-common/vrf) and not (../../vrf-ingress/vrf=current())" {
+              error-message "ingress-only and egress-only vrf should not be same";
+            }
+            must "not (../../multiplexing)" {
+              error-message "vrf multiplexing configured already. Remove it and then try again";
+            }
+            must "/ios:native/ios:vrf/ios:definition[ios:name=current()]
+                or /ios:native/ios:ip/ios:vrf[ios:name=current()]" {
+              error-message "VRF is not configured";
+            }
+          }
+          leaf egress-only {
+            type empty;
+          }
+        }
+        container vrf-ingress {
+          description "ingress-only";
+          tailf:cli-drop-node-name;
+          tailf:cli-sequence-commands;
+          tailf:cli-compact-syntax;
+          leaf vrf {
+            tailf:cli-drop-node-name;
+            type string;
+            must "not (../../vrf-common/vrf) and not (../../vrf-egress/vrf=current())" {
+              error-message "ingress-only and egress-only vrf should not be same";
+            }
+            must "not (../../multiplexing)" {
+              error-message "vrf multiplexing configured already. Remove it and then try again";
+            }
+            must "/ios:native/ios:vrf/ios:definition[ios:name=current()]
+                or /ios:native/ios:ip/ios:vrf[ios:name=current()]" {
+              error-message "VRF is not configured";
+            }
+          }
+          leaf ingress-only {
+            type empty;
+          }
+        }
+      }
+      // interface * / route-via <interface> preferred | mandatory
+      container route-via {
+        description
+          "Select subset of routes for tunnel transport";
+        tailf:cli-sequence-commands;
+        tailf:cli-compact-syntax;
+        leaf interface {
+          tailf:cli-drop-node-name;
+          tailf:cli-incomplete-command;
+          description
+            "Routing interface for tunnel packets";
+          must "starts-with(., 'Dialer') and "
+               + " (number(substring-after(., 'Dialer')) = /ios:native/ios:interface/ios:Dialer/ios:name)"
+               + " or not (starts-with(., 'Dialer'))" {
+               error-message "To use a Dialer interface, the Dialer interface has to be configured 1st, vice versa for delete";
+          }
+          type string;
+        }
+        choice route-via-choice {
+          case preferred-case {
+            leaf preferred {
+              description
+                "Preferred route, if not available, use any route";
+              type empty;
+            }
+          }
+          case mandatory-case {
+            leaf mandatory {
+              description
+                "Mandatory route, if not available, drop traffic";
+              type empty;
+            }
+          }
+        }
+      }
       leaf vrf {
         description
           "set tunnel vrf membership";
+        status deprecated;
+        tailf:hidden deprecated;
+        tailf:cli-ignore-modified;
         type string;
+      }
+      leaf mpls-ip-only {
+        description
+          "Copy DF bit from MPLS header to outer GRE";
+          must "../ios-tun:path-mtu-discovery" {
+            error-message "tunnel path-mtu-discovery needs to be configured before configuring mpls-ip-only, vice-versa for delete";	
+	  }
+        tailf:cli-diff-create-after "../ios-tun:path-mtu-discovery";
+        tailf:cli-diff-delete-before "../ios-tun:path-mtu-discovery";  
+        tailf:cli-full-command;
+        type empty;
       }
     }
   }
