@@ -267,7 +267,9 @@ class NetconfCalculator(BaseCalculator):
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') == 'leaf':
                 if self._same_text(child_self, child_other):
-                    if not s_node.get('is_key'):
+                    if s_node.get('is_key'):
+                        child_self.attrib.pop(operation_tag)
+                    else:
                         node_self.remove(child_self)
             elif s_node.get('type') == 'leaf-list':
                 if s_node.get('ordered-by') == 'user':
@@ -1061,7 +1063,7 @@ class NetconfCalculator(BaseCalculator):
                         self.diff_type == 'replace' and
                         self.replace_depth == depth + 1
                     ):
-                        child_self.set(operation_tag, 'replace')
+                        self.get_config_replace(child_self, child_other)
                     else:
                         self.node_sub(child_self, child_other, depth=depth+1)
             else:

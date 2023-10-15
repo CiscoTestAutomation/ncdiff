@@ -1187,17 +1187,19 @@ class TestNcDiff(unittest.TestCase):
         # list address
         address = delta.nc.xpath('//nc:config/jon:address',
                                  namespaces=delta.ns)
-        self.assertEqual(address[0].get(operation_tag), 'replace')
+        self.assertEqual(address[0].get(operation_tag), None)
         self.assertEqual(address[0].get(insert_tag), 'first')
         street = address[0].xpath('jon:street',
                                   namespaces=delta.ns)[0]
+        self.assertEqual(street.get(operation_tag), 'replace')
         self.assertEqual(street.text, 'Carp')
-        self.assertEqual(address[1].get(operation_tag), 'replace')
+        self.assertEqual(address[1].get(operation_tag), None)
         self.assertEqual(address[1].get(insert_tag), 'after')
         self.assertEqual(address[1].get(key_tag),
                          "[first='Bob'][last='Brown']")
         street = address[1].xpath('jon:street',
                                   namespaces=delta.ns)[0]
+        self.assertEqual(street.get(operation_tag), 'replace')
         self.assertEqual(street.text, 'Second')
         self.assertEqual(address[2].get(operation_tag), 'delete')
         first = address[2].xpath('jon:first',
@@ -1306,6 +1308,230 @@ class TestNcDiff(unittest.TestCase):
         vrf = delta.nc.xpath('//nc:config/ios:native/ios:vrf',
                              namespaces=delta.ns)
         self.assertEqual(vrf, [])
+
+    def test_delta_replace_4(self):
+        config_xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.126</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>3</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>2</name>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        config_xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.126</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>3</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>2</name>
+                      <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <source>1.1.1.1</source>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, config_xml1)
+        config2 = Config(self.d, config_xml2)
+        delta = config2 - config1
+        delta.diff_type = 'replace'
+        delta.replace_depth = 3
+
+        # leaf nat66
+        nat66 = delta.nc.xpath(
+            '//nc:config/ios:native/ios:interface/ios:Tunnel/ios-nat:nat66',
+            namespaces=delta.ns,
+        )[0]
+        self.assertEqual(nat66.get(operation_tag), 'replace')
+
+        # container tunnel
+        tunnel = delta.nc.xpath(
+            '//nc:config/ios:native/ios:interface/ios:Tunnel/ios-tun:tunnel',
+            namespaces=delta.ns
+        )[0]
+        self.assertEqual(tunnel.get(operation_tag), 'replace')
+
+        # self.assertEqual(str(delta), '')
+
+    def test_delta_replace_5(self):
+        config_xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.126</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>3</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>2</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <source>1.1.1.1</source>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        config_xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.126</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>3</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>2</name>
+                      <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <destination>
+                          <ipaddress-or-host>2.2.2.2</ipaddress-or-host>
+                        </destination>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+
+        config1 = Config(self.d, config_xml1)
+        config2 = Config(self.d, config_xml2)
+        delta = config2 - config1
+        delta.diff_type = 'replace'
+        delta.replace_depth = 4
+
+        # leaf nat66 is at level 3, but it is a leaf, so the replace operation
+        # has to be at level 3.
+        nat66 = delta.nc.xpath(
+            '//nc:config/ios:native/ios:interface/ios:Tunnel/ios-nat:nat66',
+            namespaces=delta.ns,
+        )[0]
+        self.assertEqual(nat66.get(operation_tag), 'replace')
+
+        # container destination
+        destination = delta.nc.xpath(
+            '//nc:config/ios:native/ios:interface/ios:Tunnel/ios-tun:tunnel'
+            '/ios-tun:destination',
+            namespaces=delta.ns,
+        )[0]
+        self.assertEqual(destination.get(operation_tag), 'replace')
 
     def test_xpath_1(self):
         xml = """
