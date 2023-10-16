@@ -42,11 +42,11 @@ SHORT_NO_COMMANDS = [
 # Here the config "exporter" at the second level is orderless. so regexp and
 # depth are defined as "^ *exporter " and 1.
 ORDERLESS_COMMANDS = [
-    (re.compile(r'^ *aaa authentication login '), 0),
+    (re.compile(r'^ *aaa authentication '), 0),
     (re.compile(r'^ *logging host '), 0),
     (re.compile(r'^ *flow monitor '), 0),
     (re.compile(r'^ *service-template '), 0),
-    (re.compile(r'^ *aaa group server radius '), 0),
+    (re.compile(r'^ *aaa group server '), 0),
     (re.compile(r'^ *flow exporter '), 0),
     (re.compile(r'^ *exporter '), 1),
     (re.compile(r'^ *username '), 0),
