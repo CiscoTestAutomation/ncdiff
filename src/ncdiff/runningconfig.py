@@ -50,6 +50,10 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *flow exporter '), 0),
     (re.compile(r'^ *exporter '), 1),
     (re.compile(r'^ *username '), 0),
+    (re.compile(r'^ *flow record '), 0),
+    (re.compile(r'^ *match ipv4 '), 1),
+    (re.compile(r'^ *match ipv6 '), 1),
+    (re.compile(r'^ *collect connection '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
