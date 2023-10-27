@@ -1046,3 +1046,50 @@ username guestshell privilege 0 password 7 03034E0E151B32444B0515
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_flow_record(self):
+        config_1 = """
+flow record fr_1
+  match ipv6 protocol
+flow record fr_ipv4
+  match ipv4 protocol
+  match ipv4 version
+  collect connection initiator
+  collect connection new-connections
+  collect connection server counter bytes network long
+  collect connection server counter packets long
+flow record fr_ipv6
+  match ipv6 protocol
+  match ipv6 version
+  collect connection initiator
+  collect connection new-connections
+  collect connection server counter bytes network long
+  collect connection server counter packets long
+"""
+        config_2 = """
+flow record fr_ipv4
+  match ipv4 version
+  match ipv4 protocol
+  collect connection server counter bytes network long
+  collect connection server counter packets long
+  collect connection initiator
+  collect connection new-connections
+flow record fr_ipv6
+  match ipv6 version
+  match ipv6 protocol
+  collect connection server counter bytes network long
+  collect connection server counter packets long
+  collect connection initiator
+  collect connection new-connections
+flow record fr_1
+  match ipv6 protocol
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
