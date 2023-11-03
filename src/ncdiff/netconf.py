@@ -954,6 +954,7 @@ class NetconfCalculator(BaseCalculator):
         in_s_not_in_o, in_o_not_in_s, in_s_and_in_o = \
             self._group_kids(node_self, node_other)
         ordered_by_user = {}
+        choice_nodes = {}
         for child_self in in_s_not_in_o:
             child_other = etree.Element(child_self.tag,
                                         {operation_tag: self.preferred_delete},
@@ -983,6 +984,9 @@ class NetconfCalculator(BaseCalculator):
                     e = etree.SubElement(
                         child_other, key, nsmap=key_node.nsmap)
                     e.text = key_node.text
+            if s_node.getparent().get('type') == 'case':
+                # key: choice node, value: case node
+                choice_nodes[s_node.getparent().getparent()] = s_node.getparent()
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
                                        {operation_tag: self.preferred_delete},
@@ -990,11 +994,21 @@ class NetconfCalculator(BaseCalculator):
             if self.preferred_create != 'merge':
                 child_other.set(operation_tag, self.preferred_create)
             siblings = list(node_self.iterchildren(tag=child_other.tag))
+            s_node = self.device.get_schema_node(child_other)
             if siblings:
                 siblings[-1].addnext(child_self)
             else:
-                node_self.append(child_self)
-            s_node = self.device.get_schema_node(child_other)
+                # Append node if:
+                # Node not in case
+                # Node in case but choice node not in self
+                # Node in case and choice not in self but case also in self
+                if s_node.getparent().get('type') == 'case':
+                    choice_node = s_node.getparent().getparent()
+                    if choice_node not in choice_nodes or \
+                       s_node.getparent() == choice_nodes[choice_node]:
+                        node_self.append(child_self)
+                else:
+                    node_self.append(child_self)
             if s_node.get('type') == 'leaf-list':
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:

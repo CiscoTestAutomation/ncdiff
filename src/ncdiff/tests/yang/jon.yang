@@ -42,4 +42,43 @@ module jon {
     ordered-by user;
     default "Target";
   }
+
+  container location {
+    choice city {
+      case ontario {
+        list ontario {
+          key "name";
+          leaf name {
+            type string;
+          }
+        }
+      }
+      case alberta {
+        list alberta {
+          key "name";
+          leaf name {
+            type string;
+          }
+        }
+      }
+    }
+  }
+
+  container numbers {
+    choice number {
+      case one {
+        leaf first {
+          type string;
+        }
+      }
+      case two {
+        leaf second {
+          type string;
+        }
+        leaf third {
+          type string;
+        }
+      }
+    }
+  }
 }
