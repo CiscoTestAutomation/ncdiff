@@ -1001,7 +1001,7 @@ class NetconfCalculator(BaseCalculator):
                 # Append node if:
                 # Node not in case
                 # Node in case but choice node not in self
-                # Node in case and choice not in self but case also in self
+                # Node in case and choice node in self and the same case also in self
                 if s_node.getparent().get('type') == 'case':
                     choice_node = s_node.getparent().getparent()
                     if choice_node not in choice_nodes or \
