@@ -995,6 +995,355 @@ class TestNcDiff(unittest.TestCase):
         config5 = config1 + delta3
         self.assertEqual(config2, config5)
 
+    def test_delta_7(self):
+        # choice
+        no_choice_xml = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <destination-config>
+                          <host>hostname</host>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <destination-config>
+                          <ipv4>1.1.1.1</ipv4>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml3 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <destination-config>
+                          <ipv4>2.2.2.2</ipv4>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <ipv4>1.1.1.1</ipv4>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <host>hostname</host>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta3 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel" nc:operation="delete"/>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta4 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <ipv4>2.2.2.2</ipv4>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        no_choice = Config(self.d, no_choice_xml)
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        config3 = Config(self.d, xml3)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        delta3 = no_choice - config1
+        delta4 = config1 - no_choice
+        delta5 = config3 - config2
+        delta6 = config2 - config3
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+        self.assertEqual(str(delta3).strip(), expected_delta3.strip())
+        self.assertEqual(str(delta4).strip(), expected_delta2.strip())
+        self.assertEqual(str(delta5).strip(), expected_delta4.strip())
+        self.assertEqual(str(delta6).strip(), expected_delta1.strip())
+
+    def test_delta_8(self):
+        # multiple choices
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <mode>
+                          <ethernet-config>
+                            <gre>
+                              <ipv4/>
+                            </gre>
+                          </ethernet-config>
+                        </mode>
+                        <destination-config>
+                          <ipv4>1.1.1.1</ipv4>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <mode>
+                          <ethernet-config>
+                            <l2tpv3>
+                              <manual/>
+                            </l2tpv3>
+                          </ethernet-config>
+                        </mode>
+                        <destination-config>
+                          <host>hostname</host>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <mode>
+            <ethernet-config>
+              <l2tpv3>
+                <manual/>
+              </l2tpv3>
+            </ethernet-config>
+          </mode>
+          <destination-config>
+            <host>hostname</host>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <mode>
+            <ethernet-config>
+              <gre>
+                <ipv4/>
+              </gre>
+            </ethernet-config>
+          </mode>
+          <destination-config>
+            <ipv4>1.1.1.1</ipv4>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+
+    def test_delta_9(self):
+        # choice with list
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <ontario>
+                    <name>Ottawa</name>
+                  </ontario>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <alberta xmlns="urn:jon">
+                    <name>Calgary</name>
+                  </alberta>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <location xmlns="urn:jon">
+    <alberta>
+      <name>Calgary</name>
+    </alberta>
+  </location>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <location xmlns="urn:jon">
+    <ontario>
+      <name>Ottawa</name>
+    </ontario>
+  </location>
+</nc:config>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+
+    def test_delta_10(self):
+        # choice multiple nodes in one case
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <first>one</first>
+                </numbers>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <second>two</second>
+                  <third>three</third>
+                </numbers>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <numbers xmlns="urn:jon">
+    <second>two</second>
+    <third>three</third>
+  </numbers>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <numbers xmlns="urn:jon">
+    <first>one</first>
+  </numbers>
+</nc:config>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+
     def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
