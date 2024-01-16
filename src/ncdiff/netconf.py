@@ -1,4 +1,5 @@
 import re
+import json
 import logging
 from lxml import etree
 from copy import deepcopy
@@ -142,7 +143,7 @@ class NetconfCalculator(BaseCalculator):
         'delete' or 'remove'.
 
     diff_type : `str`
-        Choice of 'minimum' or 'replace'. This value has impact on attribute
+        Choice of 'minimum' 'minimum-replace', or 'replace'. This value has impact on attribute
         nc. In general, there are two options to construct nc. The first
         option is to find out minimal changes between config_src and
         config_dst. Then attribute nc will reflect what needs to be modified.
@@ -155,20 +156,26 @@ class NetconfCalculator(BaseCalculator):
         the specified level, depending on situations. Consider roots in a YANG
         module are level 0, their children are level 1, and so on so forth.
         The default value of replace_depth is 0.
+
+    replace_xpath: `str`
+        Specify the xpath of the node to be replaced when diff_type is
+        'minimum-replace'. The default value of replace_xpath is None.
     '''
 
     def __init__(self, device, etree1, etree2,
                  preferred_create='merge',
                  preferred_replace='merge',
                  preferred_delete='delete',
-                 diff_type='minimum', replace_depth=0):
+                 diff_type='minimum', replace_depth=0, replace_xpath=None):
         '''
         __init__ instantiates a NetconfCalculator instance.
         '''
 
         BaseCalculator.__init__(self, device, etree1, etree2)
+        self.device = device
         self.diff_type = diff_type
         self.replace_depth = replace_depth
+        self.replace_xpath = replace_xpath
         if preferred_create in ['merge', 'create', 'replace']:
             self.preferred_create = preferred_create
         else:
@@ -200,7 +207,111 @@ class NetconfCalculator(BaseCalculator):
             self.get_config_replace(ele1, ele2)
         else:
             self.node_sub(ele1, ele2, depth=0)
+        # add attribute at depth if diff_type is 'minimum-replace'
+        if self.diff_type == 'minimum-replace' and self.replace_xpath:
+            namespaces = self.device._get_ns(ele1)
+            logger.debug("Namespaces:\n{}".format(json.dumps(namespaces, indent=2)))
+            self.add_attribute_by_xpath(ele1, self.replace_xpath, 'operation', 'replace', namespaces)
+        elif self.diff_type == 'minimum-replace':
+            self.add_attribute_at_depth(ele1, self.replace_depth+1, 'operation', 'replace')
         return ele1
+
+    def add_attribute_at_depth(self, root, depth, attribute, value):
+        '''add_attribute_at_depth
+        High-level api: Add an attribute to all nodes at a specified depth.
+        Parameters
+        ----------
+        root : `Element`
+            The root of a config tree.
+        depth : `int`
+            The depth of nodes to be added with an attribute.
+        attribute : `str`
+            The name of the attribute to be added.
+        value : `str`
+            The value of the attribute to be added.
+        Returns
+        -------
+        None
+        '''
+        # Initialize current_depth as -1
+        current_depth = -1
+
+        # Create a list with the root node and its depth (0)
+        nodes_to_visit = [(root, current_depth + 1)]
+
+        # While there are nodes to visit
+        while nodes_to_visit:
+            # Pop the first node and its depth from the list
+            node, current_depth = nodes_to_visit.pop(0)
+
+            # If the current node's depth matches the specified depth
+            if current_depth == depth:
+                # Add the attribute to the node
+                node.set(attribute, value)
+            # Add the attribute to the node
+            nodes_to_visit.extend((child, current_depth + 1) for child in node)
+
+    # Not used. Saved for further use-case
+    def find_by_tags(self, root, tags):
+        '''
+        Finds all nodes matching a list of tags.
+        Parameters
+        ----------
+        root : `Element`
+            The root of a config tree.
+        tags : `list` of `str`
+            The list of tags specifying the nodes to be found.
+        Returns
+        -------
+        `list` of `Element`
+            The list of matching nodes.
+        '''
+        # Start with the root element
+        nodes = [root]
+
+        # Traverse the tree for each tag
+        for tag in tags:
+            new_nodes = []
+            for node in nodes:
+                new_nodes.extend(node.findall('.//{}'.format(tag)))
+            nodes = new_nodes
+
+        return nodes
+
+    # Not used. Saved for further use-case
+    def add_attribute_by_tags(self, root, tags, attribute, value):
+        '''add_attribute_by_tags
+        '''
+        nodes = self.find_by_tags(self, root, tags)
+
+        for node in nodes:
+            node.set(attribute, value)
+
+    def add_attribute_by_xpath(self, root, xpath, attribute, value, namespaces=None):
+        '''
+        Adds an attribute to all nodes matching an XPath expression.
+        Parameters
+        ----------
+        root : `Element`
+            The root of a config tree.
+        xpath : `str`
+            The XPath expression specifying the nodes to be modified.
+        attribute : `str`
+            The name of the attribute to be added.
+        value : `str`
+            The value of the attribute to be added.
+        namespaces : `dict`, optional
+            The namespace prefix-URI mapping, by default None
+        Returns
+        -------
+        None
+        '''
+        # Find all nodes matching the XPath expression
+        nodes = root.xpath(xpath, namespaces=namespaces)
+
+        # Add the attribute to all matching nodes
+        for node in nodes:
+            node.set(attribute, value)
 
     def get_config_replace(self, node_self, node_other):
         '''get_config_replace
