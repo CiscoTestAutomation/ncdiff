@@ -972,6 +972,69 @@ service-template webauth-global-inactive
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_l2nat_instance_1(self):
+        config_1 = """
+l2nat instance test
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
+        """
+        config_2 = """
+l2nat instance test
+  inside from host 3.3.3.1 to 6.6.6.1
+  inside from host 3.3.3.2 to 6.6.6.2
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_l2nat_instance_2(self):
+        config_1 = """
+l2nat instance test
+  inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
+  outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
+        """
+        config_2 = """
+l2nat instance test
+  outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
+  inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_l2nat_instance_3(self):
+        config_1 = """
+l2nat instance test
+  inside from range 2.2.2.1 to 3.3.3.1 5
+  outside from range 3.3.3.10 to 2.2.2.10 5
+        """
+        config_2 = """
+l2nat instance test
+  outside from range 3.3.3.10 to 2.2.2.10 5
+  inside from range 2.2.2.1 to 3.3.3.1 5
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_flow_exporter(self):
         config_1 = """
 flow exporter meraki_exporter

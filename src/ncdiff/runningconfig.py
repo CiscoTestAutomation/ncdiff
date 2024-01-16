@@ -54,6 +54,12 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *match ipv4 '), 1),
     (re.compile(r'^ *match ipv6 '), 1),
     (re.compile(r'^ *collect connection '), 1),
+    (re.compile(r'^ *inside from host '), 1),
+    (re.compile(r'^ *outside from host '), 1),
+    (re.compile(r'^ *inside from network '), 1),
+    (re.compile(r'^ *outside from network '), 1),
+    (re.compile(r'^ *inside from range '), 1),
+    (re.compile(r'^ *outside from range '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
