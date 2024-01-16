@@ -986,7 +986,8 @@ class NetconfCalculator(BaseCalculator):
                     e.text = key_node.text
             if s_node.getparent().get('type') == 'case':
                 # key: choice node, value: case node
-                choice_nodes[s_node.getparent().getparent()] = s_node.getparent()
+                choice_nodes[s_node.getparent().getparent()] = \
+                    s_node.getparent()
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
                                        {operation_tag: self.preferred_delete},
@@ -999,9 +1000,10 @@ class NetconfCalculator(BaseCalculator):
                 siblings[-1].addnext(child_self)
             else:
                 # Append node if:
-                # Node not in case
-                # Node in case but choice node not in self
-                # Node in case and choice node in self and the same case also in self
+                # - Node not in case
+                # - Node in case but choice node not in self
+                # - Node in case and choice node in self and the same case also
+                #   in self
                 if s_node.getparent().get('type') == 'case':
                     choice_node = s_node.getparent().getparent()
                     if choice_node not in choice_nodes or \
