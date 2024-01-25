@@ -60,6 +60,9 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *outside from network '), 1),
     (re.compile(r'^ *inside from range '), 1),
     (re.compile(r'^ *outside from range '), 1),
+    (re.compile(r'^ *neighbor '), 1),
+    (re.compile(r'^ *neighbor '), 2),
+    (re.compile(r'^ *no neighbor '), 2),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing

@@ -1156,3 +1156,64 @@ flow record fr_1
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_neighbor(self):
+        config_1 = """
+router bgp 1.1
+  neighbor T1-ASN64901 peer-group
+  neighbor T1-ASN64901 remote-as 64901
+  neighbor T1-ASN64901 timers 5 15
+  neighbor T1-ASN2.101 peer-group
+  neighbor T1-ASN2.101 remote-as 2.101
+  neighbor 68.121.245.1 peer-group T1-ASN1.101
+  neighbor 68.121.245.1 description ba8344-627f8e-agg-t1-a-1
+  neighbor 68.121.245.13 peer-group T1-ASN1.101
+  neighbor 68.121.245.13 description ba8344-627f8e-agg-t1-a-4
+  neighbor 68.121.245.53 peer-group T1-ASN1.107
+  neighbor 68.121.245.53 description ba8344-627f8e-agg-t1-a-14
+  neighbor 68.121.245.57 peer-group T1-ASN1.108
+  neighbor 68.121.245.57 description ba8344-627f8e-agg-t1-a-15
+  address-family ipv4
+    neighbor T1-ASN64901 send-community both
+    neighbor T1-ASN64901 advertisement-interval 1
+    neighbor T1-ASN64901 allowas-in
+    neighbor T1-ASN2.101 send-community both
+    neighbor T1-ASN2.101 advertisement-interval 1
+    neighbor T1-ASN2.101 allowas-in
+    no neighbor 68.121.245.2 activate
+    no neighbor 68.121.245.1 activate
+"""
+        config_2 = """
+router bgp 1.1
+  neighbor T1-ASN2.101 peer-group
+  neighbor T1-ASN2.101 remote-as 2.101
+  neighbor T1-ASN64901 peer-group
+  neighbor T1-ASN64901 remote-as 64901
+  neighbor T1-ASN64901 timers 5 15
+  neighbor 68.121.245.1 peer-group T1-ASN1.101
+  neighbor 68.121.245.1 description ba8344-627f8e-agg-t1-a-1
+  neighbor 68.121.245.13 peer-group T1-ASN1.101
+  neighbor 68.121.245.13 description ba8344-627f8e-agg-t1-a-4
+  neighbor 68.121.245.53 peer-group T1-ASN1.107
+  neighbor 68.121.245.53 description ba8344-627f8e-agg-t1-a-14
+  neighbor 68.121.245.57 peer-group T1-ASN1.108
+  neighbor 68.121.245.57 description ba8344-627f8e-agg-t1-a-15
+  address-family ipv4
+    neighbor T1-ASN2.101 send-community both
+    neighbor T1-ASN2.101 advertisement-interval 1
+    neighbor T1-ASN2.101 allowas-in
+    no neighbor 68.121.245.1 activate
+    no neighbor 68.121.245.2 activate
+    neighbor T1-ASN64901 send-community both
+    neighbor T1-ASN64901 advertisement-interval 1
+    neighbor T1-ASN64901 allowas-in
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
