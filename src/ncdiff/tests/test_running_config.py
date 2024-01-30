@@ -995,12 +995,18 @@ l2nat instance test
 
     def test_l2nat_instance_2(self):
         config_1 = """
-l2nat instance test
+l2nat instance test1
   inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
   outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
+l2nat instance test2
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
         """
         config_2 = """
-l2nat instance test
+l2nat instance test2
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
+l2nat instance test1
   outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
   inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
         """

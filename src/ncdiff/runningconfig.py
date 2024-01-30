@@ -54,6 +54,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *match ipv4 '), 1),
     (re.compile(r'^ *match ipv6 '), 1),
     (re.compile(r'^ *collect connection '), 1),
+    (re.compile(r'^ *l2nat instance '), 0),
     (re.compile(r'^ *inside from host '), 1),
     (re.compile(r'^ *outside from host '), 1),
     (re.compile(r'^ *inside from network '), 1),
