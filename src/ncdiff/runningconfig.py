@@ -64,6 +64,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *neighbor '), 1),
     (re.compile(r'^ *neighbor '), 2),
     (re.compile(r'^ *no neighbor '), 2),
+    (re.compile(r'^ *crypto keyring '), 0),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing

@@ -1223,3 +1223,30 @@ router bgp 1.1
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_crypto_keyring(self):
+        config_1 = """
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-1
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-2
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+"""
+        config_2 = """
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-2
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-1
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
