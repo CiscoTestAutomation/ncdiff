@@ -1250,3 +1250,24 @@ crypto keyring keyring-vpn-0528f5d5eda5c3dda-1
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ip_helper_address(self):
+        config_1 = """
+interface Vlan266
+  ip helper-address 90.214.179.170
+  ip helper-address 90.214.180.36
+"""
+        config_2 = """
+interface Vlan266
+  ip helper-address 90.214.180.36
+  ip helper-address 90.214.179.170
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
