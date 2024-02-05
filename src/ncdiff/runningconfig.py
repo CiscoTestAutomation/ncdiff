@@ -66,6 +66,8 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *no neighbor '), 2),
     (re.compile(r'^ *crypto keyring '), 0),
     (re.compile(r'^ *ip helper-address '), 1),
+    (re.compile(r'^ *route-target import '), 1),
+    (re.compile(r'^ *route-target export '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing

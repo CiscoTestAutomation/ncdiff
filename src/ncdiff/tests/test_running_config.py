@@ -1271,3 +1271,29 @@ interface Vlan266
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_route_target(self):
+        config_1 = """
+vrf definition provider
+  route-target export 65002:1
+  route-target export 65002:3001
+  route-target import 65002:1
+  route-target import 65002:3001
+"""
+        config_2 = """
+
+vrf definition provider
+  route-target export 65002:3001
+  route-target export 65002:1
+  route-target import 65002:3001
+  route-target import 65002:1
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
