@@ -972,6 +972,75 @@ service-template webauth-global-inactive
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_l2nat_instance_1(self):
+        config_1 = """
+l2nat instance test
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
+        """
+        config_2 = """
+l2nat instance test
+  inside from host 3.3.3.1 to 6.6.6.1
+  inside from host 3.3.3.2 to 6.6.6.2
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_l2nat_instance_2(self):
+        config_1 = """
+l2nat instance test1
+  inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
+  outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
+l2nat instance test2
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
+        """
+        config_2 = """
+l2nat instance test2
+  inside from host 3.3.3.2 to 6.6.6.2
+  inside from host 3.3.3.1 to 6.6.6.1
+l2nat instance test1
+  outside from network 4.4.4.0 to 5.5.5.0 mask 255.255.255.0
+  inside from network 2.2.2.0 to 3.3.3.0 mask 255.255.255.0
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_l2nat_instance_3(self):
+        config_1 = """
+l2nat instance test
+  inside from range 2.2.2.1 to 3.3.3.1 5
+  outside from range 3.3.3.10 to 2.2.2.10 5
+        """
+        config_2 = """
+l2nat instance test
+  outside from range 3.3.3.10 to 2.2.2.10 5
+  inside from range 2.2.2.1 to 3.3.3.1 5
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_flow_exporter(self):
         config_1 = """
 flow exporter meraki_exporter
@@ -1083,6 +1152,141 @@ flow record fr_ipv6
   collect connection new-connections
 flow record fr_1
   match ipv6 protocol
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_neighbor(self):
+        config_1 = """
+router bgp 1.1
+  neighbor T1-ASN64901 peer-group
+  neighbor T1-ASN64901 remote-as 64901
+  neighbor T1-ASN64901 timers 5 15
+  neighbor T1-ASN2.101 peer-group
+  neighbor T1-ASN2.101 remote-as 2.101
+  neighbor 68.121.245.1 peer-group T1-ASN1.101
+  neighbor 68.121.245.1 description ba8344-627f8e-agg-t1-a-1
+  neighbor 68.121.245.13 peer-group T1-ASN1.101
+  neighbor 68.121.245.13 description ba8344-627f8e-agg-t1-a-4
+  neighbor 68.121.245.53 peer-group T1-ASN1.107
+  neighbor 68.121.245.53 description ba8344-627f8e-agg-t1-a-14
+  neighbor 68.121.245.57 peer-group T1-ASN1.108
+  neighbor 68.121.245.57 description ba8344-627f8e-agg-t1-a-15
+  address-family ipv4
+    neighbor T1-ASN64901 send-community both
+    neighbor T1-ASN64901 advertisement-interval 1
+    neighbor T1-ASN64901 allowas-in
+    neighbor T1-ASN2.101 send-community both
+    neighbor T1-ASN2.101 advertisement-interval 1
+    neighbor T1-ASN2.101 allowas-in
+    no neighbor 68.121.245.2 activate
+    no neighbor 68.121.245.1 activate
+"""
+        config_2 = """
+router bgp 1.1
+  neighbor T1-ASN2.101 peer-group
+  neighbor T1-ASN2.101 remote-as 2.101
+  neighbor T1-ASN64901 peer-group
+  neighbor T1-ASN64901 remote-as 64901
+  neighbor T1-ASN64901 timers 5 15
+  neighbor 68.121.245.1 peer-group T1-ASN1.101
+  neighbor 68.121.245.1 description ba8344-627f8e-agg-t1-a-1
+  neighbor 68.121.245.13 peer-group T1-ASN1.101
+  neighbor 68.121.245.13 description ba8344-627f8e-agg-t1-a-4
+  neighbor 68.121.245.53 peer-group T1-ASN1.107
+  neighbor 68.121.245.53 description ba8344-627f8e-agg-t1-a-14
+  neighbor 68.121.245.57 peer-group T1-ASN1.108
+  neighbor 68.121.245.57 description ba8344-627f8e-agg-t1-a-15
+  address-family ipv4
+    neighbor T1-ASN2.101 send-community both
+    neighbor T1-ASN2.101 advertisement-interval 1
+    neighbor T1-ASN2.101 allowas-in
+    no neighbor 68.121.245.1 activate
+    no neighbor 68.121.245.2 activate
+    neighbor T1-ASN64901 send-community both
+    neighbor T1-ASN64901 advertisement-interval 1
+    neighbor T1-ASN64901 allowas-in
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_crypto_keyring(self):
+        config_1 = """
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-1
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-2
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+"""
+        config_2 = """
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-2
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+crypto keyring keyring-vpn-0528f5d5eda5c3dda-1
+ local-address 37.224.37.242
+ pre-shared-key address 54.77.46.189 key Test
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ip_helper_address(self):
+        config_1 = """
+interface Vlan266
+  ip helper-address 90.214.179.170
+  ip helper-address 90.214.180.36
+"""
+        config_2 = """
+interface Vlan266
+  ip helper-address 90.214.180.36
+  ip helper-address 90.214.179.170
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_route_target(self):
+        config_1 = """
+vrf definition provider
+  route-target export 65002:1
+  route-target export 65002:3001
+  route-target import 65002:1
+  route-target import 65002:3001
+"""
+        config_2 = """
+
+vrf definition provider
+  route-target export 65002:3001
+  route-target export 65002:1
+  route-target import 65002:3001
+  route-target import 65002:1
 """
         running_diff = RunningConfigDiff(
             running1=config_1,

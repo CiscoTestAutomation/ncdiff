@@ -1849,9 +1849,9 @@ class TestNcDiff(unittest.TestCase):
                       <name>2</name>
                       <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
                       <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
-                        <destination>
-                          <ipaddress-or-host>2.2.2.2</ipaddress-or-host>
-                        </destination>
+                        <destination-config>
+                          <ipv4>2.2.2.2</ipv4>
+                        </destination-config>
                       </tunnel>
                     </Tunnel>
                   </interface>
@@ -1874,10 +1874,10 @@ class TestNcDiff(unittest.TestCase):
         )[0]
         self.assertEqual(nat66.get(operation_tag), 'replace')
 
-        # container destination
+        # container destination-config
         destination = delta.nc.xpath(
             '//nc:config/ios:native/ios:interface/ios:Tunnel/ios-tun:tunnel'
-            '/ios-tun:destination',
+            '/ios-tun:destination-config',
             namespaces=delta.ns,
         )[0]
         self.assertEqual(destination.get(operation_tag), 'replace')

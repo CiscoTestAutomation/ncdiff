@@ -54,6 +54,20 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *match ipv4 '), 1),
     (re.compile(r'^ *match ipv6 '), 1),
     (re.compile(r'^ *collect connection '), 1),
+    (re.compile(r'^ *l2nat instance '), 0),
+    (re.compile(r'^ *inside from host '), 1),
+    (re.compile(r'^ *outside from host '), 1),
+    (re.compile(r'^ *inside from network '), 1),
+    (re.compile(r'^ *outside from network '), 1),
+    (re.compile(r'^ *inside from range '), 1),
+    (re.compile(r'^ *outside from range '), 1),
+    (re.compile(r'^ *neighbor '), 1),
+    (re.compile(r'^ *neighbor '), 2),
+    (re.compile(r'^ *no neighbor '), 2),
+    (re.compile(r'^ *crypto keyring '), 0),
+    (re.compile(r'^ *ip helper-address '), 1),
+    (re.compile(r'^ *route-target import '), 1),
+    (re.compile(r'^ *route-target export '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
