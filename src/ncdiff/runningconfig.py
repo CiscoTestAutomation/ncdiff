@@ -14,8 +14,23 @@ SHORT_NO_COMMANDS = [
     'no transport output ',
     'no ip address ',
     'no ipv6 address ',
-    'no snmp-server manager',
-    'no logging dmvpn',
+]
+
+# Normally two positive commands, when one contains the other, cannot coexist.
+# For example:
+# exception crashinfo
+# exception crashinfo file bootflash:test
+#
+# Only the longer one is required:
+# exception crashinfo file bootflash:test
+#
+# But there are special cases do not follow this rule. Both lines are required:
+# snmp-server manager
+# snmp-server manager session-timeout 100
+#
+# These cases can be recorded here.
+COEXIST_SHORT_POSITIVE_COMMANDS = [
+    'snmp-server manager',
 ]
 
 # Some commands are orderless, e.g., "show running-config" output could be:
@@ -84,7 +99,6 @@ OVERWRITABLE_COMMANDS = [
     re.compile(r'^ *description '),
     re.compile(r'^ *ip address( |$)'),
     re.compile(r'^ *ipv6 address( |$)'),
-    re.compile(r'^ *logging dmvpn( |$)'),
 ]
 
 # Some commands look like a parent-child relation but actually they are
@@ -509,6 +523,10 @@ class RunningConfigDiff(object):
         for cmd_list in [positive_list, negative_list]:
             self.remove_duplicate_cammands(cmd_list)
 
+        # Remove some unnecessary commands
+        self.remove_unnecessary_negative_commands(negative_list)
+        self.remove_unnecessary_positive_commands(positive_list)
+
         return '\n'.join(positive_list), '\n'.join(reversed(negative_list))
 
     @staticmethod
@@ -642,6 +660,48 @@ class RunningConfigDiff(object):
                     break
             if tup[1] is not None:
                 RunningConfigDiff.handle_sibling_cammands(tup[1])
+
+    @staticmethod
+    def remove_unnecessary_negative_commands(negative_list):
+        cmds = [i for i, c in enumerate(negative_list)
+                if '\n' not in c]
+        indexes = set()
+        for idx1_tmp, idx1 in enumerate(cmds):
+            c1 = negative_list[idx1]
+            for idx2_tmp in range(idx1_tmp + 1, len(cmds)):
+                idx2 = cmds[idx2_tmp]
+                c2 = negative_list[idx2]
+                if c1 == c2 or len(c1) == len(c2):
+                    continue
+                if len(c1) < len(c2):
+                    if c1 == c2[:len(c1)]:
+                        indexes.add(idx2)
+                elif c1[:len(c2)] == c2:
+                    indexes.add(idx1)
+        if indexes:
+            for idx in reversed(list(indexes)):
+                del negative_list[idx]
+
+    @staticmethod
+    def remove_unnecessary_positive_commands(positive_list):
+        cmds = [i for i, c in enumerate(positive_list)
+                if '\n' not in c and c not in COEXIST_SHORT_POSITIVE_COMMANDS]
+        indexes = set()
+        for idx1_tmp, idx1 in enumerate(cmds):
+            c1 = positive_list[idx1]
+            for idx2_tmp in range(idx1_tmp + 1, len(cmds)):
+                idx2 = cmds[idx2_tmp]
+                c2 = positive_list[idx2]
+                if c1 == c2 or len(c1) == len(c2):
+                    continue
+                if len(c1) < len(c2):
+                    if c1 == c2[:len(c1)]:
+                        indexes.add(idx1)
+                elif c1[:len(c2)] == c2:
+                    indexes.add(idx2)
+        if indexes:
+            for idx in reversed(list(indexes)):
+                del positive_list[idx]
 
     def indent(self, str_in):
         str_ret = ''

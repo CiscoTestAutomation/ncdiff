@@ -612,6 +612,43 @@ no logging dmvpn
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line.strip(), expected_line.strip())
 
+    def test_cli_exception_crashinfo(self):
+        config_1 = """
+no exception crashinfo
+        """
+        config_2 = """
+exception crashinfo file bootflash:test
+exception crashinfo buffersize 33
+        """
+        expected_cli = """
+exception crashinfo file bootflash:test
+exception crashinfo buffersize 33
+        """
+        expected_reverse_cli = """
+no exception crashinfo
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+        actual_reverse_cli = running_diff.cli_reverse.strip()
+        expected_reverse_cli = expected_reverse_cli.strip()
+        actual_lines = actual_reverse_cli.split('\n')
+        expected_lines = expected_reverse_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
     def test_cli_logging_host(self):
         config_1 = """
 logging host 10.15.118.120
