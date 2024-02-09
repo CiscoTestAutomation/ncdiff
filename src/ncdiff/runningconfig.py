@@ -14,6 +14,8 @@ SHORT_NO_COMMANDS = [
     'no transport output ',
     'no ip address ',
     'no ipv6 address ',
+    'no snmp-server manager',
+    'no logging dmvpn',
 ]
 
 # Some commands are orderless, e.g., "show running-config" output could be:
@@ -82,6 +84,7 @@ OVERWRITABLE_COMMANDS = [
     re.compile(r'^ *description '),
     re.compile(r'^ *ip address( |$)'),
     re.compile(r'^ *ipv6 address( |$)'),
+    re.compile(r'^ *logging dmvpn( |$)'),
 ]
 
 # Some commands look like a parent-child relation but actually they are

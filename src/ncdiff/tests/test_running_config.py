@@ -542,6 +542,76 @@ interface Vlan70
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line.strip(), expected_line.strip())
 
+    def test_cli_snmp_server_manager(self):
+        config_1 = """
+snmp-server manager
+snmp-server manager session-timeout 100
+        """
+        config_2 = """
+        """
+        expected_cli = """
+no snmp-server manager
+        """
+        expected_reverse_cli = """
+snmp-server manager
+snmp-server manager session-timeout 100
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+        actual_reverse_cli = running_diff.cli_reverse.strip()
+        expected_reverse_cli = expected_reverse_cli.strip()
+        actual_lines = actual_reverse_cli.split('\n')
+        expected_lines = expected_reverse_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+    def test_cli_logging_dmvpn(self):
+        config_1 = """
+no logging dmvpn
+        """
+        config_2 = """
+logging dmvpn rate-limit 200
+        """
+        expected_cli = """
+logging dmvpn rate-limit 200
+        """
+        expected_reverse_cli = """
+no logging dmvpn
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+
+        self.assertTrue(running_diff)
+        actual_cli = running_diff.cli.strip()
+        expected_cli = expected_cli.strip()
+        actual_lines = actual_cli.split('\n')
+        expected_lines = expected_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
+        actual_reverse_cli = running_diff.cli_reverse.strip()
+        expected_reverse_cli = expected_reverse_cli.strip()
+        actual_lines = actual_reverse_cli.split('\n')
+        expected_lines = expected_reverse_cli.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
     def test_cli_logging_host(self):
         config_1 = """
 logging host 10.15.118.120
