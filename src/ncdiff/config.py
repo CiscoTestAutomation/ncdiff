@@ -286,7 +286,7 @@ class Config(object):
                 len(child) == 0 and
                 child_schema_node.get('type') == 'list'
             ):
-                logger.warning(
+                logger.debug(
                     "empty list entry {} under {} is pruned"
                     .format(child.tag,
                             self.device.get_xpath(child.getparent())))
@@ -420,7 +420,7 @@ class Config(object):
                 len(child) == 0 and
                 child_schema_node.get('type') == 'list'
             ):
-                logger.warning(
+                logger.debug(
                     "empty list entry {} under {} is pruned"
                     .format(child.tag,
                             self.device.get_xpath(child.getparent())))
