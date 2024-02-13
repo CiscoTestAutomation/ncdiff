@@ -533,7 +533,7 @@ class ConfigDelta(object):
         'delete' or 'remove'.
 
     diff_type : `str`
-        Choice of 'minimum' or 'replace'. This value has impact on attribute
+        Choice of 'minimum', 'minimum-replace' or 'replace'. This value has impact on attribute
         nc. In general, there are two options to construct nc. The first
         option is to find out minimal changes between config_src and
         config_dst. Then attribute nc will reflect what needs to be modified.
@@ -546,19 +546,24 @@ class ConfigDelta(object):
         the specified level, depending on situations. Consider roots in a YANG
         module are level 0, their children are level 1, and so on so forth.
         The default value of replace_depth is 0.
+
+    replace_xpath : `str`
+        Specify the xpath of the node to be replaced when diff_type is
+        'minimum-replace'. The default value of replace_xpath is None.
     '''
 
     def __init__(self, config_src, config_dst=None, delta=None,
                  preferred_create='merge',
                  preferred_replace='merge',
                  preferred_delete='delete',
-                 diff_type='minimum', replace_depth=0):
+                 diff_type='minimum', replace_depth=0, replace_xpath=None):
         '''
         __init__ instantiates a ConfigDelta instance.
         '''
 
         self.diff_type = diff_type
         self.replace_depth = replace_depth
+        self.replace_xpath = replace_xpath
         if not isinstance(config_src, Config):
             raise TypeError("argument 'config_src' must be "
                             "yang.ncdiff.Config, but not '{}'"
@@ -615,6 +620,7 @@ class ConfigDelta(object):
             preferred_delete=self.preferred_delete,
             diff_type=self.diff_type,
             replace_depth=self.replace_depth,
+            replace_xpath=self.replace_xpath,
         ).sub
 
     @property
