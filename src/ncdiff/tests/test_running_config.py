@@ -252,6 +252,31 @@ vrf definition generic
         for actual_line, expected_line in zip(actual_lines, expected_lines):
             self.assertEqual(actual_line, expected_line)
 
+    def test_diff_6(self):
+        config_1 = """
+router lisp
+ locator-set RLOC
+  IPv4-interface Loopback1 priority 100 weight 50
+  exit
+ !
+ exit
+!
+        """
+        config_2 = """
+router lisp
+ locator-set RLOC
+  IPv4-interface Loopback1 priority 100 weight 50
+  exit-locator-set
+ !
+ exit-router-lisp
+!
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+
     def test_cli_short_no_commands(self):
         config_1 = """
 vrf definition genericstring

@@ -132,6 +132,33 @@ MISSING_INDENT_COMMANDS = [
     r'^ *client ',
 ]
 
+# Sometimes there are NVGEN issues that one config state having multiple
+# running-config presentations:
+# router lisp
+#  locator-set RLOC
+#   IPv4-interface Loopback1 priority 100 weight 50
+#   exit
+#  !
+#  exit
+# !
+#
+# This exact config may show up in a different way:
+# router lisp
+#  locator-set RLOC
+#   IPv4-interface Loopback1 priority 100 weight 50
+#   exit-locator-set
+#  !
+#  exit-router-lisp
+# !
+#
+# To workaround this, we can define a tuple to replace "exit-locator-set" with
+# "exit" for example.
+REPLACING_COMMANDS = [
+    ('exit-locator-set', 'exit'),
+    ('exit-router-lisp', 'exit'),
+    ('exit-address-family', ' exit-address-family'),
+]
+
 
 class ListDiff(object):
     '''ListDiff
@@ -331,10 +358,9 @@ class RunningConfigDiff(object):
             return ''
 
     def running2list(self, str_in_1, str_in_2):
-        str_in_1 = str_in_1.replace('exit-address-family',
-                                    ' exit-address-family')
-        str_in_2 = str_in_2.replace('exit-address-family',
-                                    ' exit-address-family')
+        for cmd in REPLACING_COMMANDS:
+            str_in_1 = str_in_1.replace(*cmd)
+            str_in_2 = str_in_2.replace(*cmd)
         list_1 = self.config2list(str_in_1)
         list_2 = self.config2list(str_in_2)
         return self.handle_orderless(list_1, list_2, 0)
