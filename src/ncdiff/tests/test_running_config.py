@@ -277,6 +277,28 @@ router lisp
         )
         self.assertFalse(running_diff)
 
+    def test_diff_7(self):
+        config_1 = """
+ip dhcp pool REIAGuestVLAN
+  network 11.255.0.0 255.255.0.0
+  dns-server 1.134.28.1 9.218.88.8
+  default-router 11.255.67.1
+  lease 0 4
+        """
+        config_2 = """
+ip dhcp pool REIAGuestVLAN
+  network 11.255.0.0 255.255.0.0
+  default-router 11.255.67.1
+  dns-server 1.134.28.1 9.218.88.8
+  lease 0 4
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+
     def test_cli_short_no_commands(self):
         config_1 = """
 vrf definition genericstring
