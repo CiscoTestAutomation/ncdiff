@@ -1451,3 +1451,22 @@ vrf definition provider
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_cli_vlan_group(self):
+        config_1 = """
+vlan group test1 vlan-list 2,200
+vlan group test2 vlan-list 1-4094
+        """
+        config_2 = """
+vlan group test2 vlan-list 1-4094
+vlan group test1 vlan-list 2,200
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
