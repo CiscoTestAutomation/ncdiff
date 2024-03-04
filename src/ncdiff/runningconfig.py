@@ -88,6 +88,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *dns-server '), 1),
     (re.compile(r'^ *default-router '), 1),
     (re.compile(r'^ *lease '), 1),
+    (re.compile(r'^ *vlan group '), 0),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
