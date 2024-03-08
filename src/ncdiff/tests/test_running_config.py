@@ -299,6 +299,50 @@ ip dhcp pool REIAGuestVLAN
         )
         self.assertFalse(running_diff)
 
+    def test_diff_8(self):
+        config_1 = """
+router eigrp 100
+ timers active-time 55
+ timers graceful-restart purge-time 77
+ metric maximum-hops 5
+ metric weights 0 2 2 2 2 2
+ maximum-paths 3
+ variance 99
+ default-metric 100 100 100 100 100
+ summary-metric 7.7.0.0/16 7 7 7 7 7 distance 7
+ default-information in acl1
+ redistribute connected metric 2 2 2 2 2 route-map connected
+ redistribute eigrp 10 metric 3 3 3 3 3 route-map eigrp
+ redistribute isis isis1 level-2 metric 9 9 9 9 9 route-map isis1
+ redistribute isis level-1 metric 5 5 5 5 5 route-map isis
+ redistribute lisp metric 4 4 4 4 4 route-map lisp
+ redistribute rip metric 120 120 120 120 120 route-map rip
+        """
+        config_2 = """
+router eigrp 100
+ timers active-time 55
+ timers graceful-restart purge-time 77
+ metric maximum-hops 5
+ metric weights 0 2 2 2 2 2
+ maximum-paths 3
+ variance 99
+ default-metric 100 100 100 100 100
+ summary-metric 7.7.0.0/16 7 7 7 7 7 distance 7
+ default-information in acl1
+ redistribute connected metric 2 2 2 2 2 route-map connected
+ redistribute rip metric 120 120 120 120 120 route-map rip
+ redistribute eigrp 10 metric 3 3 3 3 3 route-map eigrp
+ redistribute isis level-1 metric 5 5 5 5 5 route-map isis
+ redistribute isis isis1 level-2 metric 9 9 9 9 9 route-map isis1
+ redistribute lisp metric 4 4 4 4 4 route-map lisp
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+
     def test_cli_short_no_commands(self):
         config_1 = """
 vrf definition genericstring
