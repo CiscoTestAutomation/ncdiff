@@ -539,7 +539,8 @@ class ContextWorker(Thread):
                 if 'in_format' in varnames:
                     kwargs['in_format'] = 'yang'
                 module_statement = self.context.add_module(**kwargs)
-                self.context.update_dependencies(module_statement)
+                if module_statement is not None:
+                    self.context.update_dependencies(module_statement)
                 self.context.modulefile_queue.task_done()
         logger.debug('Thread {} exits'.format(current_thread().name))
 
@@ -1137,6 +1138,26 @@ class ModelCompiler(object):
                 sm = child.search_one('ordered-by')
                 if sm is not None and sm.arg == 'user':
                     n.set('ordered-by', 'user')
+
+        # Tailf annotations
+        for ch in child.substmts:
+            if (
+                isinstance(ch.keyword, tuple) and
+                'tailf' in ch.keyword[0]
+            ):
+                if (
+                    ch.keyword[0] in self.module_namespaces and
+                    len(ch.keyword) == 2
+                ):
+                    n.set(
+                        etree.QName(self.module_namespaces[ch.keyword[0]],
+                                    ch.keyword[1]),
+                        ch.arg if ch.arg else '',
+                    )
+                else:
+                    logger.warning("Special Tailf annotation at {}, "
+                                   "keyword = {}"
+                                   .format(ch.pos, ch.keyword))
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
