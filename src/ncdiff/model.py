@@ -643,10 +643,12 @@ class CompilerContext(Context):
             ('includes', 'include', 'module'),
             ('imports', 'import', 'module'),
             ('revisions', 'revision', 'date'),
+            ('augments', 'augment', 'xpath'),
+            ('deviations', 'deviation', 'xpath'),
         ]:
-            parent = etree.SubElement(module_node, parent_node_name)
             statements = module_statement.search(child_node_name)
             if statements:
+                parent = etree.SubElement(module_node, parent_node_name)
                 for statement in statements:
                     child = etree.SubElement(parent, child_node_name)
                     child.set(attr_name, statement.arg)
