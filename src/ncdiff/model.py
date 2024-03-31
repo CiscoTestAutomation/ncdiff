@@ -539,7 +539,8 @@ class ContextWorker(Thread):
                 if 'in_format' in varnames:
                     kwargs['in_format'] = 'yang'
                 module_statement = self.context.add_module(**kwargs)
-                self.context.update_dependencies(module_statement)
+                if module_statement is not None:
+                    self.context.update_dependencies(module_statement)
                 self.context.modulefile_queue.task_done()
         logger.debug('Thread {} exits'.format(current_thread().name))
 
@@ -642,15 +643,44 @@ class CompilerContext(Context):
             ('includes', 'include', 'module'),
             ('imports', 'import', 'module'),
             ('revisions', 'revision', 'date'),
+            ('augments', 'augment', 'xpath'),
+            ('deviations', 'deviation', 'xpath'),
         ]:
-            parent = etree.SubElement(module_node, parent_node_name)
             statements = module_statement.search(child_node_name)
             if statements:
+                parent = etree.SubElement(module_node, parent_node_name)
                 for statement in statements:
                     child = etree.SubElement(parent, child_node_name)
                     child.set(attr_name, statement.arg)
                     if child_node_name in ['include', 'import']:
                         dependencies.add(statement.arg)
+                        if child_node_name == 'import':
+                            child.set('prefix',
+                                      statement.search_one('prefix').arg)
+
+        for node_name in [
+            'container',
+            'leaf',
+            'leaf-list',
+            'list',
+            'choice',
+            'uses',
+        ]:
+            exposed_statements = []
+            for stmt in module_statement.search(node_name):
+                for substmt in stmt.substmts:
+                    if (
+                        'tailf' in substmt.keyword[0] and
+                        len(substmt.keyword) == 2 and
+                        substmt.keyword[1] == 'hidden'
+                    ):
+                        break
+                else:
+                    exposed_statements.append(stmt)
+            if exposed_statements:
+                parent = etree.SubElement(module_node, 'roots')
+                break
+
         return dependencies
 
     def write_dependencies(self):
@@ -1137,6 +1167,26 @@ class ModelCompiler(object):
                 sm = child.search_one('ordered-by')
                 if sm is not None and sm.arg == 'user':
                     n.set('ordered-by', 'user')
+
+        # Tailf annotations
+        for ch in child.substmts:
+            if (
+                isinstance(ch.keyword, tuple) and
+                'tailf' in ch.keyword[0]
+            ):
+                if (
+                    ch.keyword[0] in self.module_namespaces and
+                    len(ch.keyword) == 2
+                ):
+                    n.set(
+                        etree.QName(self.module_namespaces[ch.keyword[0]],
+                                    ch.keyword[1]),
+                        ch.arg if ch.arg else '',
+                    )
+                else:
+                    logger.warning("Special Tailf annotation at {}, "
+                                   "keyword = {}"
+                                   .format(ch.pos, ch.keyword))
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
