@@ -654,6 +654,33 @@ class CompilerContext(Context):
                     child.set(attr_name, statement.arg)
                     if child_node_name in ['include', 'import']:
                         dependencies.add(statement.arg)
+                        if child_node_name == 'import':
+                            child.set('prefix',
+                                      statement.search_one('prefix').arg)
+
+        for node_name in [
+            'container',
+            'leaf',
+            'leaf-list',
+            'list',
+            'choice',
+            'uses',
+        ]:
+            exposed_statements = []
+            for stmt in module_statement.search(node_name):
+                for substmt in stmt.substmts:
+                    if (
+                        'tailf' in substmt.keyword[0] and
+                        len(substmt.keyword) == 2 and
+                        substmt.keyword[1] == 'hidden'
+                    ):
+                        break
+                else:
+                    exposed_statements.append(stmt)
+            if exposed_statements:
+                parent = etree.SubElement(module_node, 'roots')
+                break
+
         return dependencies
 
     def write_dependencies(self):
