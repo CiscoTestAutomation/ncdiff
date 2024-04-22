@@ -719,10 +719,18 @@ class CompilerContext(Context):
                 revisions[mudule_name] < module_revision
             ):
                 revisions[mudule_name] = module_revision
+        self.sort_modules()
         self.validate()
         if 'prune' in dir(statements.Statement):
             for mudule_name, module_revision in revisions.items():
                 self.modules[(mudule_name, module_revision)].prune()
+
+    def sort_modules(self):
+        submodules = {k: m for k, m in self.modules.items()
+                      if m.keyword == "submodule"}
+        for k in submodules:
+            del self.modules[k]
+        self.modules.update(submodules)
 
     def internal_reset(self):
         self.modules = {}
