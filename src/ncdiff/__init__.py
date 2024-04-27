@@ -4,7 +4,7 @@ payload of a Netconf get-config reply, and a diff is the payload of a
 edit-config message."""
 
 # metadata
-__version__ = '24.3'
+__version__ = '24.4'
 __author__ = 'Jonathan Yang <yuekyang@cisco.com>'
 __copyright__ = 'Cisco Systems, Inc.'
 
