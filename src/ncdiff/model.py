@@ -8,7 +8,7 @@ from lxml import etree
 from copy import deepcopy
 from ncclient import operations
 from threading import Thread, current_thread
-from pyang import statements
+from pyang import statements, util
 try:
     from pyang.repository import FileRepository
 except ImportError:
@@ -943,6 +943,7 @@ class ModelCompiler(object):
         self.module_prefixes = {}
         self.module_namespaces = {}
         self.identity_deps = {}
+        self.groupings = {}
         self.build_dependencies()
 
     @property
@@ -1066,6 +1067,7 @@ class ModelCompiler(object):
         vm = self.context.get_module(module)
         st = etree.Element(vm.arg)
         st.set('type', vm.keyword)
+        self.st_grp = etree.SubElement(st, 'groupings')
         statement = vm.search_one('prefix')
         if statement is None:
             raise ValueError("Module '{}' is a {} which belongs to '{}'. "
@@ -1130,10 +1132,13 @@ class ModelCompiler(object):
 
     def depict_a_schema_node(self, module, parent, child, mode=None):
         n = etree.SubElement(
-            parent, '{' +
+            parent,
+            '{' +
             self.module_namespaces[child.i_module.i_modulename] +
-            '}' + child.arg)
-        self.set_access(child, n, mode)
+            '}' + child.arg,
+        )
+        if mode != 'grouping':
+            self.set_access(child, n, mode)
         n.set('type', child.keyword)
         sm = child.search_one('status')
         if sm is not None and sm.arg in ['deprecated', 'obsolete']:
@@ -1207,7 +1212,31 @@ class ModelCompiler(object):
 
         if hasattr(child, 'i_children'):
             for c in child.i_children:
-                if mode == 'rpc' and c.keyword in ['input', 'output']:
+                if hasattr(c, 'i_uses') and len(c.i_uses) > 0:
+                    us = c.i_uses[-1]
+                    modulename = us.i_grouping.i_module.i_modulename
+                    prefix, name = util.split_identifier(us.i_grouping.arg)
+                    us_node = etree.SubElement(
+                        n,
+                        '{' +
+                        self.module_namespaces[modulename] +
+                        '}' + name,
+                    )
+                    us_node.set('type', us.keyword)
+                    sm = us.search_one('status')
+                    if sm is not None and sm.arg in ['deprecated', 'obsolete']:
+                        us_node.set('status', sm.arg)
+                    if modulename not in self.groupings:
+                        self.groupings[modulename] = []
+                    if us.i_grouping not in self.groupings[modulename]:
+                        self.groupings[modulename].append(us.i_grouping)
+                        self.depict_a_schema_node(
+                            module=module,
+                            parent=self.st_grp,
+                            child=us.i_grouping,
+                            mode='grouping',
+                        )
+                elif mode == 'rpc' and c.keyword in ['input', 'output']:
                     self.depict_a_schema_node(module, n, c, mode=c.keyword)
                 else:
                     self.depict_a_schema_node(module, n, c, mode=mode)
