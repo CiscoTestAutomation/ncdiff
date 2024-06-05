@@ -90,11 +90,16 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *lease '), 1),
     (re.compile(r'^ *vlan group '), 0),
     (re.compile(r'^ *redistribute '), 1),
+    (re.compile(r'^ *redistribute '), 2),
     (re.compile(r'^ *redistribute '), 3),
     (re.compile(r'^ *distribute-list prefix-list '), 1),
     (re.compile(r'^ *ip route '), 0),
     (re.compile(r'^ *ipv6 route '), 0),
     (re.compile(r'^ *bandwidth remaining ratio '), 2),
+    (re.compile(r'^ *ntp server '), 0),
+    (re.compile(r'^ *mpls mldp static '), 0),
+    (re.compile(r'^ *device-tracking binding '), 0),
+    (re.compile(r'^ *summary-address '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
