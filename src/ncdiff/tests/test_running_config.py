@@ -1514,3 +1514,95 @@ vlan group test1 vlan-list 2,200
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ntp_server(self):
+        config_1 = """
+ntp server 132.163.97.1
+ntp server 76.223.76.249
+ntp server 132.163.97.2
+ntp server 132.163.96.2
+ntp server 132.163.97.4
+ntp server 129.6.15.28
+ntp server 13.248.205.44
+ntp server 52.223.30.47
+ntp server 35.71.132.215
+        """
+        config_2 = """
+ntp server 76.223.76.249
+ntp server 132.163.97.1
+ntp server 132.163.96.2
+ntp server 132.163.97.2
+ntp server 13.248.205.44
+ntp server 129.6.15.28
+ntp server 132.163.97.4
+ntp server 35.71.132.215
+ntp server 52.223.30.47
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_mpls_mldp_static(self):
+        config_1 = """
+mpls mldp static mp2mp 10.10.10.10 1
+mpls mldp static mp2mp 11.11.11.11 1
+        """
+        config_2 = """
+mpls mldp static mp2mp 11.11.11.11 1
+mpls mldp static mp2mp 10.10.10.10 1
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_device_tracking_binding_static(self):
+        config_1 = """
+device-tracking binding reachable-lifetime 240
+device-tracking binding reachable-lifetime 60
+        """
+        config_2 = """
+device-tracking binding reachable-lifetime 60
+device-tracking binding reachable-lifetime 240
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_summary_address(self):
+        config_1 = """
+af-interface Port-channel57
+  summary-address 2001:420:c0::/42
+  summary-address 2001:420:a0::/43
+        """
+        config_2 = """
+af-interface Port-channel57
+  summary-address 2001:420:a0::/43
+  summary-address 2001:420:c0::/42
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
