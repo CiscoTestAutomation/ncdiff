@@ -343,6 +343,18 @@ router eigrp 100
         )
         self.assertFalse(running_diff)
 
+    def test_diff_tailing_whitespace(self):
+        config_1 = """
+interface Tunnel1
+ description POD IPSec Tunnel vpn-0528f5d5eda5c3dda-1"""
+        config_2 = config_1 + " "
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+
     def test_cli_short_no_commands(self):
         config_1 = """
 vrf definition genericstring
