@@ -1216,16 +1216,16 @@ class ModelCompiler(object):
                     us = c.i_uses[-1]
                     modulename = us.i_grouping.i_module.i_modulename
                     prefix, name = util.split_identifier(us.i_grouping.arg)
-                    us_node = etree.SubElement(
-                        n,
-                        '{' +
-                        self.module_namespaces[modulename] +
-                        '}' + name,
-                    )
-                    us_node.set('type', us.keyword)
-                    sm = us.search_one('status')
-                    if sm is not None and sm.arg in ['deprecated', 'obsolete']:
-                        us_node.set('status', sm.arg)
+                    tag = '{' + self.module_namespaces[modulename] + '}' + name
+                    if n.find(tag) is None:
+                        us_node = etree.SubElement(n, tag)
+                        us_node.set('type', us.keyword)
+                        sm = us.search_one('status')
+                        if (
+                            sm is not None and
+                            sm.arg in ['deprecated', 'obsolete']
+                        ):
+                            us_node.set('status', sm.arg)
                     if modulename not in self.groupings:
                         self.groupings[modulename] = []
                     if us.i_grouping not in self.groupings[modulename]:
