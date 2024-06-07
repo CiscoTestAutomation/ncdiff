@@ -399,9 +399,12 @@ class RunningConfigDiff(object):
                 if last_line:
                     if last_indentation > 0:
                         list_ret.append((
-                            last_line, self.config2list(last_section), ''))
+                            last_line.rstrip(),
+                            self.config2list(last_section),
+                            '',
+                        ))
                     else:
-                        list_ret.append((last_line, None, ''))
+                        list_ret.append((last_line.rstrip(), None, ''))
                 last_line = ''
                 last_section = ''
                 last_indentation = 0
@@ -442,18 +445,21 @@ class RunningConfigDiff(object):
                 if last_line:
                     if last_indentation > 0:
                         list_ret.append((
-                            last_line, self.config2list(last_section), ''))
+                            last_line.rstrip(),
+                            self.config2list(last_section),
+                            '',
+                        ))
                     else:
-                        list_ret.append((last_line, None, ''))
+                        list_ret.append((last_line.rstrip(), None, ''))
                 last_line = line
                 last_section = ''
                 last_indentation = 0
         if last_line:
             if last_indentation > 0:
                 list_ret.append((
-                    last_line, self.config2list(last_section), ''))
+                    last_line.rstrip(), self.config2list(last_section), ''))
             else:
-                list_ret.append((last_line, None, ''))
+                list_ret.append((last_line.rstrip(), None, ''))
         return list_ret
 
     def list2config(self, list_in, diff_type=None):
