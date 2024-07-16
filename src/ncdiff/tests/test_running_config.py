@@ -1618,3 +1618,22 @@ af-interface Port-channel57
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_mpls_ldp_advertise_labels(self):
+        config_1 = """
+mpls ldp advertise-labels for 32 to mpls
+mpls ldp advertise-labels for cisco
+        """
+        config_2 = """
+mpls ldp advertise-labels for cisco
+mpls ldp advertise-labels for 32 to mpls
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')

@@ -101,6 +101,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *mpls mldp static '), 0),
     (re.compile(r'^ *device-tracking binding '), 0),
     (re.compile(r'^ *summary-address '), 1),
+    (re.compile(r'^ *mpls ldp advertise-labels for '), 0),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing
