@@ -4,7 +4,7 @@ payload of a Netconf get-config reply, and a diff is the payload of a
 edit-config message."""
 
 # metadata
-__version__ = '24.5'
+__version__ = '24.7'
 __author__ = 'Jonathan Yang <yuekyang@cisco.com>'
 __copyright__ = 'Cisco Systems, Inc.'
 
@@ -27,11 +27,13 @@ def _repr_rpcreply(self):
                                      self._root.tag,
                                      hex(id(self)))
 
+
 def _repr_notification(self):
     return '<{}.{} {} at {}>'.format(self.__class__.__module__,
                                      self.__class__.__name__,
                                      self._root_ele.tag,
                                      hex(id(self)))
+
 
 def _str_rpcreply(self):
     self.parse()
@@ -39,10 +41,12 @@ def _str_rpcreply(self):
     xml_ele = etree.XML(xml_str, etree.XMLParser(remove_blank_text=True))
     return etree.tostring(xml_ele, encoding='unicode', pretty_print=True)
 
+
 def _str_notification(self):
     xml_str = etree.tostring(self._root_ele, encoding='unicode')
     xml_ele = etree.XML(xml_str, etree.XMLParser(remove_blank_text=True))
     return etree.tostring(xml_ele, encoding='unicode', pretty_print=True)
+
 
 def _str_response(self):
     http_versions = {10: 'HTTP/1.0', 11: 'HTTP/1.1'}
@@ -55,12 +59,14 @@ def _str_response(self):
         ret += '\n\n' + self.text
     return ret
 
+
 def xpath_rpcreply(self, *args, **kwargs):
     if 'namespaces' not in kwargs:
         kwargs['namespaces'] = self.ns
         return self._root.xpath(*args, **kwargs)
     else:
         return self._root.xpath(*args, **kwargs)
+
 
 def xpath_notification(self, *args, **kwargs):
     if 'namespaces' not in kwargs:
@@ -69,8 +75,10 @@ def xpath_notification(self, *args, **kwargs):
     else:
         return self._root_ele.xpath(*args, **kwargs)
 
+
 def ns_help(self):
     pprint.pprint(self.ns)
+
 
 operations.rpc.RPCReply.__repr__ = _repr_rpcreply
 operations.rpc.RPCReply.__str__ = _str_rpcreply
@@ -82,6 +90,7 @@ if getattr(transport, 'notify', None):
     transport.notify.Notification.__str__ = _str_notification
     transport.notify.Notification.xpath = xpath_notification
     transport.notify.Notification.ns_help = ns_help
+
 
 # below is a workaround of the bug in lxml:
 # https://bugs.launchpad.net/lxml/+bug/1424232
@@ -104,10 +113,12 @@ def _append(self, element):
     if len(element) > 0:
         recreate(element, child)
 
+
 from ncclient.xml_ import new_ele, sub_ele, validated_element, qualify, to_xml
 
-def request(self, config, format='xml', target='candidate', default_operation=None,
-        test_option=None, error_option=None):
+
+def request(self, config, format='xml', target='candidate',
+            default_operation=None, test_option=None, error_option=None):
     """Loads all or part of the specified *config* to the *target* configuration datastore.
     *target* is the name of the configuration datastore being edited
     *config* is the configuration, which must be rooted in the `config` element. It can be specified either as a string or an :class:`~xml.etree.ElementTree.Element`.
@@ -127,7 +138,7 @@ def request(self, config, format='xml', target='candidate', default_operation=No
         self._assert(':validate')
         sub_ele(node, "test-option").text = test_option
     if default_operation is not None:
-    # TODO: check if it is a valid default-operation
+        # TODO: check if it is a valid default-operation
         sub_ele(node, "default-operation").text = default_operation
 # <<<<<<< HEAD
 #         node.append(validated_element(config, ("config", qualify("config"))))
@@ -141,14 +152,15 @@ def request(self, config, format='xml', target='candidate', default_operation=No
 # >>>>>>> juniper
     return self._request(node)
 
+
 def _wrap(self, subele):
     # internal use
     ele = new_ele("rpc", {"message-id": self._id},
                   **self._device_handler.get_xml_extra_prefix_kwargs())
     # ele.append(subele)
     _append(ele, subele)
-    #print to_xml(ele)
     return to_xml(ele)
+
 
 operations.edit.EditConfig.request = request
 operations.rpc.RPC._wrap = _wrap
