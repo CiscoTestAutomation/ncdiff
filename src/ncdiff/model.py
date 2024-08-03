@@ -1133,9 +1133,8 @@ class ModelCompiler(object):
     def depict_a_schema_node(self, module, parent, child, mode=None):
         n = etree.SubElement(
             parent,
-            '{' +
-            self.module_namespaces[child.i_module.i_modulename] +
-            '}' + child.arg,
+            f'{{{self.module_namespaces[child.i_module.i_modulename]}}}'
+            f'{child.arg}'
         )
         if mode != 'grouping':
             self.set_access(child, n, mode)
@@ -1201,6 +1200,10 @@ class ModelCompiler(object):
                                    "keyword = {}"
                                    .format(ch.pos, ch.keyword))
 
+        # Position
+        if hasattr(child, "pos"):
+            n.set("pos", f"{child.pos.ref}#{child.pos.line}")
+
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
             featurenames.extend([
@@ -1216,7 +1219,7 @@ class ModelCompiler(object):
                     us = c.i_uses[-1]
                     modulename = us.i_grouping.i_module.i_modulename
                     prefix, name = util.split_identifier(us.i_grouping.arg)
-                    tag = '{' + self.module_namespaces[modulename] + '}' + name
+                    tag = f'{{{self.module_namespaces[modulename]}}}{name}'
                     if n.find(tag) is None:
                         us_node = etree.SubElement(n, tag)
                         us_node.set('type', us.keyword)
@@ -1226,6 +1229,12 @@ class ModelCompiler(object):
                             sm.arg in ['deprecated', 'obsolete']
                         ):
                             us_node.set('status', sm.arg)
+                        if hasattr(us, "i_grouping"):
+                            us_node.set(
+                                "pos",
+                                f"{us.i_grouping.pos.ref}"
+                                f"#{us.i_grouping.pos.line}"
+                            )
                     if modulename not in self.groupings:
                         self.groupings[modulename] = []
                     if us.i_grouping not in self.groupings[modulename]:
