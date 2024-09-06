@@ -61,6 +61,7 @@ COEXIST_SHORT_POSITIVE_COMMANDS = [
 ORDERLESS_COMMANDS = [
     (re.compile(r'^ *aaa authentication '), 0),
     (re.compile(r'^ *aaa group server '), 0),
+    (re.compile(r'^ *radius server '), 0),
     (re.compile(r'^ *logging host '), 0),
     (re.compile(r'^ *flow exporter '), 0),
     (re.compile(r'^ *flow record '), 0),
