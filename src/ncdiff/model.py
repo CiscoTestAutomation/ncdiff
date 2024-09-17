@@ -1136,8 +1136,7 @@ class ModelCompiler(object):
             f'{{{self.module_namespaces[child.i_module.i_modulename]}}}'
             f'{child.arg}'
         )
-        if mode != 'grouping':
-            self.set_access(child, n, mode)
+        self.set_access(child, n, mode)
         n.set('type', child.keyword)
         sm = child.search_one('status')
         if sm is not None and sm.arg in ['deprecated', 'obsolete']:
@@ -1202,7 +1201,8 @@ class ModelCompiler(object):
 
         # Position
         if hasattr(child, "pos"):
-            n.set("pos", f"{child.pos.ref}#{child.pos.line}")
+            yangfile = os.path.basename(child.pos.ref)
+            n.set("pos", f"{yangfile}#{child.pos.line}")
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
@@ -1215,40 +1215,59 @@ class ModelCompiler(object):
 
         if hasattr(child, 'i_children'):
             for c in child.i_children:
-                if hasattr(c, 'i_uses') and len(c.i_uses) > 0:
-                    us = c.i_uses[-1]
-                    modulename = us.i_grouping.i_module.i_modulename
-                    prefix, name = util.split_identifier(us.i_grouping.arg)
-                    tag = f'{{{self.module_namespaces[modulename]}}}{name}'
-                    if n.find(tag) is None:
-                        us_node = etree.SubElement(n, tag)
-                        us_node.set('type', us.keyword)
-                        sm = us.search_one('status')
-                        if (
-                            sm is not None and
-                            sm.arg in ['deprecated', 'obsolete']
-                        ):
-                            us_node.set('status', sm.arg)
-                        if hasattr(us, "i_grouping"):
-                            us_node.set(
-                                "pos",
-                                f"{us.i_grouping.pos.ref}"
-                                f"#{us.i_grouping.pos.line}"
-                            )
-                    if modulename not in self.groupings:
-                        self.groupings[modulename] = []
-                    if us.i_grouping not in self.groupings[modulename]:
-                        self.groupings[modulename].append(us.i_grouping)
-                        self.depict_a_schema_node(
-                            module=module,
-                            parent=self.st_grp,
-                            child=us.i_grouping,
-                            mode='grouping',
-                        )
-                elif mode == 'rpc' and c.keyword in ['input', 'output']:
+                if mode == 'rpc' and c.keyword in ['input', 'output']:
                     self.depict_a_schema_node(module, n, c, mode=c.keyword)
                 else:
-                    self.depict_a_schema_node(module, n, c, mode=mode)
+                    if hasattr(c, 'i_uses') and len(c.i_uses) > 0:
+                        us = c.i_uses[-1]
+                        grp = us.i_grouping
+                        modulename = grp.i_module.i_modulename
+                        prefix, name = util.split_identifier(grp.arg)
+                        tag = f'{{{self.module_namespaces[modulename]}}}{name}'
+
+                        # set a grouping statement
+                        if modulename not in self.groupings:
+                            self.groupings[modulename] = {}
+                        if grp not in self.groupings[modulename]:
+                            grp_node = etree.SubElement(
+                                self.st_grp,
+                                f'{{{self.module_namespaces[modulename]}}}'
+                                f'{grp.arg}'
+                            )
+                            self.groupings[modulename][grp] = grp_node
+
+                        # recursive calls
+                        if hasattr(child, 'i_uses') and child.i_uses[-1] == us:
+                            self.depict_a_schema_node(
+                                module=module,
+                                parent=n,
+                                child=c,
+                                mode=mode,
+                            )
+                        else:
+                            # set a use statement
+                            if n.find(tag) is None:
+                                us_node = etree.SubElement(n, tag)
+                                us_node.set('type', us.keyword)
+                                sm = us.search_one('status')
+                                if (
+                                    sm is not None and
+                                    sm.arg in ['deprecated', 'obsolete']
+                                ):
+                                    us_node.set('status', sm.arg)
+                                yangfile = os.path.basename(us.pos.ref)
+                                us_node.set(
+                                    "pos",
+                                    f"{yangfile}"
+                                    f"#{us.pos.line}"
+                                )
+
+                            self.depict_a_schema_node(
+                                module=module,
+                                parent=self.groupings[modulename][grp],
+                                child=c,
+                                mode=mode,
+                            )
 
     @staticmethod
     def set_access(statement, node, mode):
