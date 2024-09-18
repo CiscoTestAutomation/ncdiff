@@ -1131,10 +1131,14 @@ class ModelCompiler(object):
         return Model(st)
 
     def depict_a_schema_node(self, module, parent, child, mode=None):
+        tag = f'{{{self.module_namespaces[child.i_module.i_modulename]}}}' + \
+              f'{child.arg}'
+        n = parent.find(tag)
+        if n is not None and mode == 'groupings':
+            return
         n = etree.SubElement(
             parent,
-            f'{{{self.module_namespaces[child.i_module.i_modulename]}}}'
-            f'{child.arg}'
+            tag,
         )
         self.set_access(child, n, mode)
         n.set('type', child.keyword)
@@ -1245,7 +1249,6 @@ class ModelCompiler(object):
                                 mode=mode,
                             )
                         else:
-                            # set a use statement
                             if n.find(tag) is None:
                                 us_node = etree.SubElement(n, tag)
                                 us_node.set('type', us.keyword)
@@ -1266,8 +1269,15 @@ class ModelCompiler(object):
                                 module=module,
                                 parent=self.groupings[modulename][grp],
                                 child=c,
-                                mode=mode,
+                                mode='groupings',
                             )
+                    else:
+                        self.depict_a_schema_node(
+                            module=module,
+                            parent=n,
+                            child=c,
+                            mode=mode,
+                        )
 
     @staticmethod
     def set_access(statement, node, mode):
