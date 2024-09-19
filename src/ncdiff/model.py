@@ -1238,6 +1238,7 @@ class ModelCompiler(object):
                                 f'{{{self.module_namespaces[modulename]}}}'
                                 f'{grp.arg}'
                             )
+                            grp_node.set('type', 'grouping')
                             self.groupings[modulename][grp] = grp_node
 
                         # recursive calls
