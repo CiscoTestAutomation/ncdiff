@@ -1193,11 +1193,12 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    n.set(
-                        etree.QName(self.module_namespaces[ch.keyword[0]],
-                                    ch.keyword[1]),
-                        ch.arg if ch.arg else '',
-                    )
+                    # n.set(
+                    #     etree.QName(self.module_namespaces[ch.keyword[0]],
+                    #                 ch.keyword[1]),
+                    #     ch.arg if ch.arg else '',
+                    # )
+                    n.set(ch.keyword[1], ch.arg if ch.arg else '')
                 else:
                     logger.warning("Special Tailf annotation at {}, "
                                    "keyword = {}"
