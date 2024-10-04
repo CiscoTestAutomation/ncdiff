@@ -1305,6 +1305,7 @@ class ModelCompiler(object):
             datatype = ''
         else:
             if sm.arg == 'leafref':
+                datatype = sm.arg
                 p = sm.search_one('path')
                 if p is not None:
                     # Try to make the path as compact as possible.
@@ -1322,12 +1323,16 @@ class ModelCompiler(object):
                         else:
                             target.append(prefix + ':' + name)
                             curprefix = prefix
-                    datatype = "-> %s" % "/".join(target)
+                    leaf_node.set("path", "/".join(target))
                 else:
-                    datatype = sm.arg
+                    leaf_node.set("path", "")
             elif sm.arg == 'identityref':
+                datatype = sm.arg
                 idn_base = sm.search_one('base')
-                datatype = sm.arg + ":" + idn_base.arg
+                if idn_base is not None:
+                    leaf_node.set("base", idn_base.arg)
+                else:
+                    leaf_node.set("base", "")
             else:
                 datatype = sm.arg
             leaf_node.set('datatype', datatype)
