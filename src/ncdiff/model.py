@@ -19,6 +19,7 @@ except ImportError:
     from pyang import Context
 
 from .errors import ModelError
+from .composer import Tag, split_tag
 
 
 # create a logger for this module
@@ -944,6 +945,7 @@ class ModelCompiler(object):
         self.module_namespaces = {}
         self.identity_deps = {}
         self.groupings = {}
+        self.filter = []
         self.build_dependencies()
 
     @property
@@ -1130,12 +1132,45 @@ class ModelCompiler(object):
 
         return Model(st)
 
-    def depict_a_schema_node(self, module, parent, child, mode=None):
+    def set_namespace_to_prefix(self):
+        if hasattr(self, "namespace_to_prefix") or not self.module_namespaces:
+            return
+        modulenames = {self.module_namespaces[i]: i
+                       for i in self.module_namespaces}
+        self.namespace_to_prefix = {i: self.module_prefixes.get(modulenames[i])
+                                    for i in modulenames}
+
+    def get_xpath(self, ancestors):
+        self.set_namespace_to_prefix()
+        ids = [""]
+        for ancestor in ancestors:
+            ns, node_name = split_tag(ancestor, Tag.LXML_ETREE)
+            ids.append(f"{self.namespace_to_prefix.get(ns, '')}:{node_name}")
+        return "/".join(ids)
+
+    def match_filter(self, xpath):
+        xpath_pieces = xpath.split("/")
+        xpath_length = len(xpath_pieces)
+        for filter in self.filter:
+            filter_pieces = filter.split("/")
+            length = min(len(filter_pieces), xpath_length)
+            if (
+                "/".join(filter_pieces[:length]) ==
+                "/".join(xpath_pieces[:length])
+            ):
+                return True
+        return False
+
+    def depict_a_schema_node(self, module, parent, child,
+                             mode=None, ancestors=[]):
         tag = f'{{{self.module_namespaces[child.i_module.i_modulename]}}}' + \
               f'{child.arg}'
+
+        # In groupings mode, skip if a node exists
         n = parent.find(tag)
         if n is not None and mode == 'groupings':
             return
+
         n = etree.SubElement(
             parent,
             tag,
@@ -1218,10 +1253,21 @@ class ModelCompiler(object):
         if featurenames:
             n.set('if-feature', ' '.join(featurenames))
 
+        child_ancestors = ancestors + [tag]
         if hasattr(child, 'i_children'):
             for c in child.i_children:
+
+                # Skip if the Xpath of node c does not match self.filter
+                c_namespace = self.module_namespaces[c.i_module.i_modulename]
+                c_tag = f'{{{c_namespace}}}{c.arg}'
+                if self.filter:
+                    c_xpath = self.get_xpath(child_ancestors + [c_tag])
+                    if not self.match_filter(c_xpath):
+                        continue
+
                 if mode == 'rpc' and c.keyword in ['input', 'output']:
-                    self.depict_a_schema_node(module, n, c, mode=c.keyword)
+                    self.depict_a_schema_node(module, n, c, mode=c.keyword,
+                                              ancestors=child_ancestors)
                 else:
                     if hasattr(c, 'i_uses') and len(c.i_uses) > 0:
                         us = c.i_uses[-1]
@@ -1249,6 +1295,7 @@ class ModelCompiler(object):
                                 parent=n,
                                 child=c,
                                 mode=mode,
+                                ancestors=child_ancestors,
                             )
                         else:
                             if n.find(tag) is None:
@@ -1272,6 +1319,7 @@ class ModelCompiler(object):
                                 parent=self.groupings[modulename][grp],
                                 child=c,
                                 mode='groupings',
+                                ancestors=child_ancestors,
                             )
                     else:
                         self.depict_a_schema_node(
@@ -1279,6 +1327,7 @@ class ModelCompiler(object):
                             parent=n,
                             child=c,
                             mode=mode,
+                            ancestors=child_ancestors,
                         )
 
     @staticmethod
