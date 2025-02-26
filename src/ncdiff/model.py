@@ -8,7 +8,7 @@ from lxml import etree
 from copy import deepcopy
 from ncclient import operations
 from threading import Thread, current_thread
-from pyang import statements, util
+from pyang import statements
 try:
     from pyang.repository import FileRepository
 except ImportError:
@@ -19,7 +19,6 @@ except ImportError:
     from pyang import Context
 
 from .errors import ModelError
-from .composer import Tag, split_tag
 
 
 # create a logger for this module
@@ -945,7 +944,6 @@ class ModelCompiler(object):
         self.module_namespaces = {}
         self.identity_deps = {}
         self.groupings = {}
-        self.filter = []
         self.build_dependencies()
 
     @property
@@ -1069,7 +1067,6 @@ class ModelCompiler(object):
         vm = self.context.get_module(module)
         st = etree.Element(vm.arg)
         st.set('type', vm.keyword)
-        self.st_grp = etree.SubElement(st, 'groupings')
         statement = vm.search_one('prefix')
         if statement is None:
             raise ValueError("Module '{}' is a {} which belongs to '{}'. "
@@ -1132,39 +1129,10 @@ class ModelCompiler(object):
 
         return Model(st)
 
-    def set_namespace_to_prefix(self):
-        if hasattr(self, "namespace_to_prefix") or not self.module_namespaces:
-            return
-        modulenames = {self.module_namespaces[i]: i
-                       for i in self.module_namespaces}
-        self.namespace_to_prefix = {i: self.module_prefixes.get(modulenames[i])
-                                    for i in modulenames}
-
-    def get_xpath(self, ancestors):
-        self.set_namespace_to_prefix()
-        ids = [""]
-        for ancestor in ancestors:
-            ns, node_name = split_tag(ancestor, Tag.LXML_ETREE)
-            ids.append(f"{self.namespace_to_prefix.get(ns, '')}:{node_name}")
-        return "/".join(ids)
-
-    def match_filter(self, xpath):
-        xpath_pieces = xpath.split("/")
-        xpath_length = len(xpath_pieces)
-        for filter in self.filter:
-            filter_pieces = filter.split("/")
-            length = min(len(filter_pieces), xpath_length)
-            if (
-                "/".join(filter_pieces[:length]) ==
-                "/".join(xpath_pieces[:length])
-            ):
-                return True
-        return False
-
     def depict_a_schema_node(self, module, parent, child,
-                             mode=None, ancestors=[]):
-        tag = f'{{{self.module_namespaces[child.i_module.i_modulename]}}}' + \
-              f'{child.arg}'
+                             mode=None):
+        tag_modulename = child.i_module.i_modulename
+        tag = f'{{{self.module_namespaces[tag_modulename]}}}{child.arg}'
 
         # In groupings mode, skip if a node exists
         n = parent.find(tag)
@@ -1253,82 +1221,17 @@ class ModelCompiler(object):
         if featurenames:
             n.set('if-feature', ' '.join(featurenames))
 
-        child_ancestors = ancestors + [tag]
         if hasattr(child, 'i_children'):
             for c in child.i_children:
-
-                # Skip if the Xpath of node c does not match self.filter
-                c_namespace = self.module_namespaces[c.i_module.i_modulename]
-                c_tag = f'{{{c_namespace}}}{c.arg}'
-                if self.filter:
-                    c_xpath = self.get_xpath(child_ancestors + [c_tag])
-                    if not self.match_filter(c_xpath):
-                        continue
-
                 if mode == 'rpc' and c.keyword in ['input', 'output']:
-                    self.depict_a_schema_node(module, n, c, mode=c.keyword,
-                                              ancestors=child_ancestors)
+                    self.depict_a_schema_node(module, n, c, mode=c.keyword)
                 else:
-                    if hasattr(c, 'i_uses') and len(c.i_uses) > 0:
-                        us = c.i_uses[-1]
-                        grp = us.i_grouping
-                        modulename = grp.i_module.i_modulename
-                        prefix, name = util.split_identifier(grp.arg)
-                        tag = f'{{{self.module_namespaces[modulename]}}}{name}'
-
-                        # set a grouping statement
-                        if modulename not in self.groupings:
-                            self.groupings[modulename] = {}
-                        if grp not in self.groupings[modulename]:
-                            grp_node = etree.SubElement(
-                                self.st_grp,
-                                f'{{{self.module_namespaces[modulename]}}}'
-                                f'{grp.arg}'
-                            )
-                            grp_node.set('type', 'grouping')
-                            self.groupings[modulename][grp] = grp_node
-
-                        # recursive calls
-                        if hasattr(child, 'i_uses') and child.i_uses[-1] == us:
-                            self.depict_a_schema_node(
-                                module=module,
-                                parent=n,
-                                child=c,
-                                mode=mode,
-                                ancestors=child_ancestors,
-                            )
-                        else:
-                            if n.find(tag) is None:
-                                us_node = etree.SubElement(n, tag)
-                                us_node.set('type', us.keyword)
-                                sm = us.search_one('status')
-                                if (
-                                    sm is not None and
-                                    sm.arg in ['deprecated', 'obsolete']
-                                ):
-                                    us_node.set('status', sm.arg)
-                                yangfile = os.path.basename(us.pos.ref)
-                                us_node.set(
-                                    "pos",
-                                    f"{yangfile}"
-                                    f"#{us.pos.line}"
-                                )
-
-                            self.depict_a_schema_node(
-                                module=module,
-                                parent=self.groupings[modulename][grp],
-                                child=c,
-                                mode='groupings',
-                                ancestors=child_ancestors,
-                            )
-                    else:
-                        self.depict_a_schema_node(
-                            module=module,
-                            parent=n,
-                            child=c,
-                            mode=mode,
-                            ancestors=child_ancestors,
-                        )
+                    self.depict_a_schema_node(
+                        module=module,
+                        parent=n,
+                        child=c,
+                        mode=mode,
+                    )
 
     @staticmethod
     def set_access(statement, node, mode):
