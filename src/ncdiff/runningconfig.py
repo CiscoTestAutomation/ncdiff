@@ -60,6 +60,7 @@ COEXIST_SHORT_POSITIVE_COMMANDS = [
 # depth are defined as "^ *exporter " and 1.
 ORDERLESS_COMMANDS = [
     (re.compile(r'^ *aaa authentication '), 0),
+    (re.compile(r'^ *aaa accounting system default '), 0),
     (re.compile(r'^ *aaa group server '), 0),
     (re.compile(r'^ *radius server '), 0),
     (re.compile(r'^ *logging host '), 0),
@@ -568,8 +569,7 @@ class RunningConfigDiff(object):
                     idx_positive_dict[exact_cmd] = idx_positive
 
         if idx_positive_list:
-            idx_positive_list.sort()
-            for idx in reversed(idx_positive_list):
+            for idx in sorted(idx_positive_list, reverse=True):
                 del positive_list[idx]
 
         # Handle duplicate commands
@@ -737,7 +737,7 @@ class RunningConfigDiff(object):
                 elif c1[:len(c2)] == c2:
                     indexes.add(idx1)
         if indexes:
-            for idx in reversed(list(indexes)):
+            for idx in sorted(indexes, reverse=True):
                 del negative_list[idx]
 
     @staticmethod
@@ -758,7 +758,7 @@ class RunningConfigDiff(object):
                 elif c1[:len(c2)] == c2:
                     indexes.add(idx2)
         if indexes:
-            for idx in reversed(list(indexes)):
+            for idx in sorted(indexes, reverse=True):
                 del positive_list[idx]
 
     def indent(self, str_in):
