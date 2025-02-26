@@ -1637,3 +1637,22 @@ mpls ldp advertise-labels for 32 to mpls
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_aaa_accounting_system_default(self):
+        config_1 = """
+aaa accounting system default vrf vrf2 start-stop group RAD_Server
+aaa accounting system default vrf vrf1 start-stop group RAD_Server
+        """
+        config_2 = """
+aaa accounting system default vrf vrf1 start-stop group RAD_Server
+aaa accounting system default vrf vrf2 start-stop group RAD_Server
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
