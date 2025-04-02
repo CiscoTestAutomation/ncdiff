@@ -1,10 +1,8 @@
 import os
 import re
 
-import six
 import logging
 from lxml import etree
-from copy import deepcopy
 from ncclient import manager, operations, transport, xml_
 from ncclient.devices.default import DefaultDeviceHandler
 
@@ -18,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 nc_url = xml_.BASE_NS_1_0
 yang_url = 'urn:ietf:params:xml:ns:yang:1'
-tailf_url= 'http://tail-f.com/ns/netconf/params/1.1'
+tailf_url = 'http://tail-f.com/ns/netconf/params/1.1'
 ncEvent_url = xml_.NETCONF_NOTIFICATION_NS
 config_tag = '{' + nc_url + '}config'
 filter_tag = '{' + nc_url + '}filter'
@@ -33,7 +31,8 @@ special_prefixes = {
 def connect(*args, **kwargs):
     """
     Initialize a :class:`ModelDevice` over the SSH transport.
-    For documentation of arguments see :meth:`ncclient.transport.SSHSession.connect`.
+    For documentation of arguments see
+    :meth:`ncclient.transport.SSHSession.connect`.
     The underlying :class:`ncclient.transport.SSHSession` is created with
         :data:`CAPABILITIES`. It is first instructed to
         :meth:`~ncclient.transport.SSHSession.load_known_hosts` and then
@@ -47,7 +46,7 @@ def connect(*args, **kwargs):
         session.load_known_hosts()
 
     try:
-       session.connect(*args, **kwargs)
+        session.connect(*args, **kwargs)
     except Exception as ex:
         if session.transport:
             session.close()
@@ -478,7 +477,7 @@ class ModelDevice(manager.Manager):
             reply.ns = self._get_ns(reply._root_ele)
         return reply
 
-    def extract_config(self, reply, type='netconf'):
+    def extract_config(self, reply, type='netconf', remove_deprecated=False):
         '''extract_config
 
         High-level api: Extract config from a rpc-reply of get-config or get
@@ -523,9 +522,9 @@ class ModelDevice(manager.Manager):
                 elif len(child) > 0:
                     remove_read_only(child)
 
-        config = Config(self, reply)
+        config = Config(self, reply, validate=True,
+                        remove_deprecated=remove_deprecated)
         remove_read_only(config.ele)
-        config.validate_config()
         return config
 
     def get_schema_node(self, config_node):

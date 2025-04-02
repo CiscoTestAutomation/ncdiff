@@ -3451,3 +3451,105 @@ class TestNcDiff(unittest.TestCase):
                        '/oc-netinst:config/oc-netinst:name/text()')
         self.assertEqual(name, ['Mgmt-intf'])
 
+    def test_extract_config_1(self):
+        config_xml = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <foo xmlns="urn:jon">abc</foo>
+                <tracking xmlns="urn:jon">
+                  <enabled>true</enabled>
+                </tracking>
+                <address xmlns="urn:jon">
+                  <last>Brown</last>
+                  <first>Bob</first>
+                  <street>Innovation</street>
+                  <city>New York</city>
+                  <city-v2>New York</city-v2>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Paul</last>
+                  <first>Bob</first>
+                  <street>Express</street>
+                  <city>Kanata</city>
+                  <city-v2>Kanata</city-v2>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Wang</last>
+                  <first>Ken</first>
+                  <street>Main</street>
+                  <city>Boston</city>
+                  <city-v2>Boston</city-v2>
+                </address>
+                <store xmlns="urn:jon">Dollar</store>
+                <store xmlns="urn:jon">Cheap</store>
+                <store xmlns="urn:jon">Quick</store>
+              </data>
+            </rpc-reply>
+            """
+        config = self.d.extract_config(
+            config_xml,
+            remove_deprecated=False,
+        )
+        nodes = config.xpath(
+            '/nc:config/jon:address[jon:last="Brown"][jon:first="Bob"]'
+            '/jon:city/text()'
+        )
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0], 'New York')
+        nodes = config.xpath(
+            '/nc:config/jon:address[jon:last="Brown"][jon:first="Bob"]'
+            '/jon:city-v2/text()'
+        )
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0], 'New York')
+
+    def test_extract_config_2(self):
+        config_xml = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <foo xmlns="urn:jon">abc</foo>
+                <tracking xmlns="urn:jon">
+                  <enabled>true</enabled>
+                </tracking>
+                <address xmlns="urn:jon">
+                  <last>Brown</last>
+                  <first>Bob</first>
+                  <street>Innovation</street>
+                  <city>New York</city>
+                  <city-v2>New York</city-v2>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Paul</last>
+                  <first>Bob</first>
+                  <street>Express</street>
+                  <city>Kanata</city>
+                  <city-v2>Kanata</city-v2>
+                </address>
+                <address xmlns="urn:jon">
+                  <last>Wang</last>
+                  <first>Ken</first>
+                  <street>Main</street>
+                  <city>Boston</city>
+                  <city-v2>Boston</city-v2>
+                </address>
+                <store xmlns="urn:jon">Dollar</store>
+                <store xmlns="urn:jon">Cheap</store>
+                <store xmlns="urn:jon">Quick</store>
+              </data>
+            </rpc-reply>
+            """
+        config = self.d.extract_config(
+            config_xml,
+            remove_deprecated=True,
+        )
+        nodes = config.xpath(
+            '/nc:config/jon:address[jon:last="Brown"][jon:first="Bob"]'
+            '/jon:city/text()'
+        )
+        self.assertEqual(len(nodes), 0)
+        nodes = config.xpath(
+            '/nc:config/jon:address[jon:last="Brown"][jon:first="Bob"]'
+            '/jon:city-v2/text()'
+        )
+        self.assertEqual(len(nodes), 1)
+        self.assertEqual(nodes[0], 'New York')

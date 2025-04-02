@@ -58,13 +58,15 @@ class Config(object):
         `{url}tagname` notation, and values are corresponding model names.
     '''
 
-    def __init__(self, ncdevice, config=None, validate=True):
+    def __init__(self, ncdevice, config=None, validate=True,
+                 remove_deprecated=False):
         '''
         __init__ instantiates a Config instance.
         '''
 
         self.device = ncdevice
         self.parser = None
+        self.remove_deprecated = remove_deprecated
         if config is None:
             self.ele = etree.Element(config_tag, nsmap={'nc': nc_url})
         elif (
@@ -126,7 +128,7 @@ class Config(object):
             return NotImplemented
 
     def __sub__(self, other):
-        if type(other) == Config:
+        if isinstance(other, Config):
             return ConfigDelta(config_src=other, config_dst=self)
         elif isinstance(other, ConfigDelta):
             return self.__add__(-other)
@@ -294,8 +296,10 @@ class Config(object):
 
             # cleanup obsoleted or deprecated nodes
             elif (
-                child_schema_node.get('status') == 'obsolete' or
-                child_schema_node.get('status') == 'deprecated'
+                child_schema_node.get('status') == 'obsolete' or (
+                    child_schema_node.get('status') == 'deprecated' and
+                    self.remove_deprecated
+                )
             ):
                 self.ele.remove(child)
 
@@ -428,8 +432,10 @@ class Config(object):
 
             # cleanup obsoleted or deprecated nodes
             elif (
-                child_schema_node.get('status') == 'obsolete' or
-                child_schema_node.get('status') == 'deprecated'
+                child_schema_node.get('status') == 'obsolete' or (
+                    child_schema_node.get('status') == 'deprecated' and
+                    self.remove_deprecated
+                )
             ):
                 node.remove(child)
 
@@ -533,12 +539,12 @@ class ConfigDelta(object):
         'delete' or 'remove'.
 
     diff_type : `str`
-        Choice of 'minimum', 'minimum-replace' or 'replace'. This value has impact on attribute
-        nc. In general, there are two options to construct nc. The first
-        option is to find out minimal changes between config_src and
-        config_dst. Then attribute nc will reflect what needs to be modified.
-        The second option is to use 'replace' operation in Netconf. More
-        customers prefer 'replace' operation as it is more deterministic.
+        Choice of 'minimum', 'minimum-replace' or 'replace'. This value has
+        impact on attribute nc. In general, there are two options to construct
+        nc. The first option is to find out minimal changes between config_src
+        and config_dst. Then attribute nc will reflect what needs to be
+        modified. The second option is to use 'replace' operation in Netconf.
+        More customers prefer 'replace' operation as it is more deterministic.
 
     replace_depth : `int`
         Specify the deepest level of replace operation when diff_type is
