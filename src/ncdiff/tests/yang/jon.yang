@@ -7,6 +7,11 @@ module jon {
       "Initial revision";
   }
 
+  revision 2025-04-02 {
+    description
+      "Deprecated two nodes";
+  }
+
   leaf foo {
     type string;
   }
@@ -14,6 +19,24 @@ module jon {
   container tracking {
     leaf enabled {
       type boolean;
+      default "false"; /* Deprecated, use 'enabled-v2' instead */
+      status deprecated; /* Marked as deprecated in the 2025-04-02 revision */
+    }
+    leaf enabled-v2 {
+      type boolean;
+    }
+    container logging {
+      leaf local {
+        type boolean;
+      }
+      container server {
+        leaf host {
+          type string;
+        }
+        leaf port {
+          type uint16;
+        }
+      }
     }
   }
 
@@ -33,6 +56,12 @@ module jon {
       description "Street name";
     }
     leaf city {
+      type string;
+      description "City name";
+      default "Unknown"; /* Deprecated, use 'city-v2' instead */
+      status deprecated; /* Marked as deprecated in the 2025-04-02 revision */
+    }
+    leaf city-v2 {
       type string;
       description "City name";
     }
