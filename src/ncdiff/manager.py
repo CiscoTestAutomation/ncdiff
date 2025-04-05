@@ -740,6 +740,84 @@ class ModelDevice(manager.Manager):
             xpath=self.get_xpath(node, type=Tag.LXML_XPATH, instance=False),
         )
 
+    def default_in_use(self, schema_node):
+        '''
+        High-level api: Given a schema node, return a list of schema nodes
+        that are descendants and their default values are in use, if the given
+        schema node exists in a data tree. This method is useful to determine
+        if a default value for a leaf or leaf-list is in use in a data tree.
+
+        Parameters
+        ----------
+
+        schema_node : `Element`
+            A schema node in question.
+
+        Returns
+        -------
+
+        list
+            A list of schema nodes that are descendants of the given schema
+            node and their default values are in use if the given schema node
+            exists in a data tree. If such schema node does not exist, it
+            returns an empty list.
+
+
+        Code Example::
+
+            >>> m.load_model('openconfig-interfaces')
+            >>> prefixes = {n[1]: n[2] for n in m.namespaces}
+            >>> nodes = m.models["openconfig-interfaces"].tree.xpath(
+                    "//oc-if:interfaces/oc-if:interface",
+                    namespaces=prefixes,
+                )
+            >>> print(nodes)
+            [<Element {http://openconfig.net/yang/interfaces}interface at 0x7ff632320ac0>]
+            >>> defaults = m.default_in_use(nodes[0])
+            >>> print([m.get_xpath(n) for n in defaults])
+            ...
+        '''
+
+        default_nodes = []
+        for child in schema_node:
+            if (
+                child.get('type') in ('leaf', 'leaf-list') and
+                child.get('default') is not None
+            ):
+                default_nodes.append(child)
+            elif (
+                child.get('type') == 'choice' and
+                child.get('default') is not None
+            ):
+                default_case = child.get('default')
+                default_ns, _ = self.convert_tag(
+                    default_ns='',
+                    tag=child.tag,
+                    src=Tag.LXML_ETREE,
+                    dst=Tag.LXML_XPATH,
+                )
+                default_ns = self.convert_ns(
+                    ns=default_ns,
+                    src=Tag.NAMESPACE,
+                    dst=Tag.PREFIX,
+                )
+                _, tag = self.convert_tag(
+                    default_ns=default_ns,
+                    tag=default_case,
+                    src=Tag.XPATH,
+                    dst=Tag.LXML_ETREE,
+                )
+                default_case_node = child.find(tag)
+                if default_case_node is not None:
+                    default_nodes.append(default_case_node)
+                    default_nodes += self.default_in_use(default_case_node)
+            elif (
+                child.get('type') == 'container' and
+                child.get('presence') != 'true'
+            ):
+                default_nodes += self.default_in_use(child)
+        return default_nodes
+
     def convert_tag(self, default_ns, tag, src=Tag.LXML_ETREE, dst=Tag.YTOOL):
         '''convert_tag
 

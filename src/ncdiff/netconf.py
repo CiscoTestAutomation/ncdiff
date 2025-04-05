@@ -1070,10 +1070,12 @@ class NetconfCalculator(BaseCalculator):
             child_other = etree.Element(child_self.tag,
                                         {operation_tag: self.preferred_delete},
                                         nsmap=child_self.nsmap)
-            if self.preferred_create != 'merge':
-                child_self.set(operation_tag, self.preferred_create)
             if self.diff_type == 'replace':
                 child_self.set(operation_tag, 'replace')
+            elif self.preferred_create == 'replace':
+                child_self.set(operation_tag, self.preferred_create)
+            elif self.preferred_create == 'create':
+                self.set_create_operation(child_self)
             siblings = list(node_other.iterchildren(tag=child_self.tag))
             if siblings:
                 siblings[-1].addnext(child_other)
@@ -1103,8 +1105,10 @@ class NetconfCalculator(BaseCalculator):
             child_self = etree.Element(child_other.tag,
                                        {operation_tag: self.preferred_delete},
                                        nsmap=child_other.nsmap)
-            if self.preferred_create != 'merge':
+            if self.preferred_create == 'replace':
                 child_other.set(operation_tag, self.preferred_create)
+            elif self.preferred_create == 'create':
+                self.set_create_operation(child_other)
             siblings = list(node_self.iterchildren(tag=child_other.tag))
             s_node = self.device.get_schema_node(child_other)
             if siblings:
@@ -1229,6 +1233,37 @@ class NetconfCalculator(BaseCalculator):
                                 for k in keys
                             ]
                             item.set(key_tag, ''.join(id_list))
+
+    def set_create_operation(self, node):
+        '''set_create_operation
+
+        Low-level api: Set the `operation` attribute of a node to `create` when
+        it is not already set. This method is used when the preferred_create is
+        `create`.
+
+        Parameters
+        ----------
+
+        node : `Element`
+            A config node in a config tree.
+
+        Returns
+        -------
+
+        None
+            There is no return of this method.
+        '''
+
+        schema_node = self.device.get_schema_node(node)
+        if (
+            schema_node.get('type') == 'container' and
+            schema_node.get('presence') != 'true' and
+            len(self.device.default_in_use(schema_node)) > 0
+        ):
+            for child in node:
+                self.set_create_operation(child)
+        else:
+            node.set(operation_tag, 'create')
 
     @staticmethod
     def _url_to_prefix(node, id):
