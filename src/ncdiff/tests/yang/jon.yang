@@ -74,6 +74,7 @@ module jon {
 
   container location {
     choice city {
+      default alberta;
       case ontario {
         list ontario {
           key "name";
@@ -87,6 +88,27 @@ module jon {
           key "name";
           leaf name {
             type string;
+          }
+        }
+        container other-info {
+          leaf detail {
+            type string;
+            description "Additional information about Alberta.";
+          }
+          container geo-facts {
+            leaf area {
+              type int16;
+              description "Area of Alberta.";
+            }
+            leaf population {
+              type int16;
+              description "Population of Alberta.";
+            }
+            leaf code {
+              type string;
+              description "Code for Alberta.";
+              default "AB";
+            }
           }
         }
       }

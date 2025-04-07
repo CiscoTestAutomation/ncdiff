@@ -1344,6 +1344,136 @@ class TestNcDiff(unittest.TestCase):
         self.assertEqual(str(delta1).strip(), expected_delta1.strip())
         self.assertEqual(str(delta2).strip(), expected_delta2.strip())
 
+    def test_delta_11(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <first>one</first>
+                </numbers>
+                <location xmlns="urn:jon">
+                  <ontario>
+                    <name>Ottawa</name>
+                  </ontario>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <first>one</first>
+                  <third>three</third>
+                </numbers>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                  <other-info>
+                    <detail>Some detail</detail>
+                  </other-info>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        delta1.preferred_create = "create"
+        delta2.preferred_create = "create"
+        verification = [
+            (delta1, "/nc:config/jon:numbers/jon:third"),
+
+            # Create operation at list alberta is allowed as it does not have
+            # default.
+            (delta1, "/nc:config/jon:location/jon:alberta"),
+
+            # Create operation at other-info is not allowed as it has defaults.
+            (delta1, "/nc:config/jon:location/jon:other-info/jon:detail"),
+
+            (delta2, "/nc:config/jon:location/jon:ontario"),
+        ]
+        for delta, xpath in verification:
+            nodes = delta.nc.xpath(
+                xpath,
+                namespaces=delta.ns)
+            self.assertEqual(
+                len(nodes),
+                1,
+                f"Expected to find xpath '{xpath}' in delta "
+                f"but the delta is {delta.nc}",
+            )
+            for node in nodes:
+                self.assertEqual(
+                    node.get(operation_tag),
+                    "create",
+                    f"Expected 'create' operation at {xpath} "
+                    f"but got the delta {delta.nc} instead.",
+                )
+
+    def test_delta_12(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <first>one</first>
+                </numbers>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <numbers xmlns="urn:jon">
+                  <first>one</first>
+                  <third>three</third>
+                </numbers>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                  <other-info>
+                    <detail>Some detail</detail>
+                  </other-info>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        delta1.preferred_create = "create"
+        delta2.preferred_create = "create"
+        verification = [
+            (delta1, "/nc:config/jon:numbers/jon:third"),
+
+            # Create operation at location is not allowed as it has defaults.
+            (delta1, "/nc:config/jon:location/jon:alberta"),
+
+            # Create operation at other-info is not allowed as it has defaults.
+            (delta1, "/nc:config/jon:location/jon:other-info/jon:detail"),
+        ]
+        for delta, xpath in verification:
+            nodes = delta.nc.xpath(
+                xpath,
+                namespaces=delta.ns)
+            self.assertEqual(
+                len(nodes),
+                1,
+                f"Expected to find xpath '{xpath}' in delta "
+                f"but the delta is {delta.nc}",
+            )
+            for node in nodes:
+                self.assertEqual(
+                    node.get(operation_tag),
+                    "create",
+                    f"Expected 'create' operation at {xpath} "
+                    f"but got the delta {delta.nc} instead.",
+                )
+
     def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
@@ -3553,3 +3683,66 @@ class TestNcDiff(unittest.TestCase):
         )
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0], 'New York')
+
+    def test_default_in_use_1(self):
+      prefixes = {n[1]: n[2] for n in self.d.namespaces}
+      nodes = self.d.models["jon"].tree.xpath(
+          "/jon/jon:address",
+          namespaces=prefixes,
+      )
+      self.assertEqual(len(nodes), 1)
+      address = nodes[0]
+      defaults = self.d.default_in_use(address)
+      self.assertEqual(len(defaults), 1)
+      self.assertEqual(
+          defaults[0].tag,
+          "{urn:jon}city"
+      )
+
+    def test_default_in_use_2(self):
+      xpaths = [
+          "/jon:location/city/alberta",
+          "/jon:location/city/alberta/other-info/geo-facts/code",
+      ]
+      prefixes = {n[1]: n[2] for n in self.d.namespaces}
+      nodes = self.d.models["jon"].tree.xpath(
+          "/jon/jon:location",
+          namespaces=prefixes,
+      )
+      self.assertEqual(len(nodes), 1)
+      address = nodes[0]
+      defaults = self.d.default_in_use(address)
+      xpaths = [
+          self.d.get_xpath(n)
+          for n in defaults
+      ]
+      self.assertEqual(len(defaults), 2)
+      for xpath in xpaths:
+          self.assertIn(xpath, xpaths)
+
+    def test_default_in_use_3(self):
+      xpaths = [
+          "/oc-if:interfaces/interface/oc-vlan:routed-vlan/oc-ip:ipv4"
+          "/unnumbered/config/enabled",
+          "/oc-if:interfaces/interface/oc-vlan:routed-vlan/oc-ip:ipv4"
+          "/unnumbered/state/enabled",
+          "/oc-if:interfaces/interface/oc-vlan:routed-vlan/oc-ip:ipv4"
+          "/config/enabled",
+          "/oc-if:interfaces/interface/oc-vlan:routed-vlan/oc-ip:ipv4"
+          "/state/enabled",
+      ]
+      prefixes = {n[1]: n[2] for n in self.d.namespaces}
+      nodes = self.d.models["openconfig-interfaces"].tree.xpath(
+          "//oc-if:interfaces/oc-if:interface/oc-vlan:routed-vlan/oc-ip:ipv4",
+          namespaces=prefixes,
+      )
+      self.assertEqual(len(nodes), 1)
+      interface = nodes[0]
+      defaults = self.d.default_in_use(interface)
+      xpaths = [
+          self.d.get_xpath(n)
+          for n in defaults
+      ]
+      self.assertEqual(len(defaults), 4)
+      for xpath in xpaths:
+          self.assertIn(xpath, xpaths)
