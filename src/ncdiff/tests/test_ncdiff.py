@@ -1474,6 +1474,54 @@ class TestNcDiff(unittest.TestCase):
                     f"but got the delta {delta.nc} instead.",
                 )
 
+    def test_delta_13(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <tracking xmlns="urn:jon">
+                  <logging>
+                    <local>true</local>
+                  </logging>
+                </tracking>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta1.preferred_create = "create"
+        verification = [
+            # Create operation at tracking or logging, which are non-presence
+            # containers, is not allowed as per confd implementation although
+            # the expected behavior is ambiguous in RFC7950. More discussion
+            # can be found in the Tail-F ticket PS-47089:
+            # https://sedona.atlassian.net/servicedesk/customer/portal/4/PS-47089
+            (delta1, "/nc:config/jon:tracking/jon:logging/jon:local"),
+        ]
+        for delta, xpath in verification:
+            nodes = delta.nc.xpath(
+                xpath,
+                namespaces=delta.ns)
+            self.assertEqual(
+                len(nodes),
+                1,
+                f"Expected to find xpath '{xpath}' in delta "
+                f"but the delta is {delta.nc}",
+            )
+            for node in nodes:
+                self.assertEqual(
+                    node.get(operation_tag),
+                    "create",
+                    f"Expected 'create' operation at {xpath} "
+                    f"but got the delta {delta.nc} instead.",
+                )
+
     def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">

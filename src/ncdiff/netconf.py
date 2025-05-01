@@ -1255,10 +1255,15 @@ class NetconfCalculator(BaseCalculator):
         '''
 
         schema_node = self.device.get_schema_node(node)
+
+        # Create operation at tracking or logging, which are non-presence
+        # containers, is not allowed as per confd implementation although the
+        # expected behavior is ambiguous in RFC7950. More discussion can be
+        # found in the Tail-F ticket PS-47089:
+        # https://sedona.atlassian.net/servicedesk/customer/portal/4/PS-47089
         if (
             schema_node.get('type') == 'container' and
-            schema_node.get('presence') != 'true' and
-            len(self.device.default_in_use(schema_node)) > 0
+            schema_node.get('presence') != 'true'
         ):
             for child in node:
                 self.set_create_operation(child)
