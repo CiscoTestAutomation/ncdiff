@@ -1656,3 +1656,183 @@ aaa accounting system default vrf vrf2 start-stop group RAD_Server
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ip_multicast_routing(self):
+        config_1 = """
+ip multicast-routing vrf blue
+ip multicast-routing vrf green
+ipv6 multicast-routing vrf blue
+ipv6 multicast-routing vrf green
+ip pim vrf blue rp-address 10.2.255.255
+ip pim vrf green rp-address 10.2.255.255
+ip pim vrf green register-source Loopback201
+ipv6 pim vrf green rp-address FC00:2:255::255
+ipv6 pim vrf green register-source Loopback201
+ipv6 pim vrf blue rp-address FC00:2:255::255
+        """
+        config_2 = """
+ip multicast-routing vrf green
+ip multicast-routing vrf blue
+ipv6 multicast-routing vrf green
+ipv6 multicast-routing vrf blue
+ip pim vrf green rp-address 10.2.255.255
+ip pim vrf green register-source Loopback201
+ip pim vrf blue rp-address 10.2.255.255
+ipv6 pim vrf blue rp-address FC00:2:255::255
+ipv6 pim vrf green rp-address FC00:2:255::255
+ipv6 pim vrf green register-source Loopback201
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_mix_cli_1(self):
+        config_1 = """
+flow file-export default
+  file max-count 2
+  file max-create-interval 5
+  no file header option-data
+  no metadata producer netflowStatistics
+  no metadata producer deviceInfo
+  no metadata producer statsLoggerWdavc
+  no metadata producer intfQosStats
+  no metadata producer intfStats
+  no metadata producer fnfMonitorStats
+flow record TA1-noavc-v4-in
+  description ta1_noavc_ingress
+  match flow direction
+  match interface input
+  match ipv4 source address
+  collect counter bytes long
+  collect counter packets long
+flow monitor TA1-noavc-v4-out
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-noavc-v4-out
+flow monitor TA1-v4-in
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-v4-in
+flow monitor TA1-v4-out
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-v4-out
+dot1x system-auth-control
+service-template aaa-unreachable-flag
+service-template bounce-port-flag
+service-template eap-seen
+service-template DEFAULT_LINKSEC_POLICY_MUST_SECURE
+  linksec policy must-secure
+service-template DEFAULT_LINKSEC_POLICY_SHOULD_SECURE
+  linksec policy should-secure
+service-template DEFAULT_CRITICAL_VOICE_TEMPLATE
+  voice vlan
+service-template DEFAULT_CRITICAL_DATA_TEMPLATE
+service-template secure-connect-ap-aaa-down
+service-template secure-connect-break-flag
+service-template secure-connect-failed-flag
+service-template secure-connect-in-progress-flag
+service-template secure-connect-success-flag
+redundancy
+  mode sso
+username admin autocommand exit
+username meraki-tdluser secret 9 $9$bxyCQRkMW7/jcV$7lyZFWDgXROwmZjjTj0Bf32mVzahq/aE6fNqe.00bFs
+ip dns server
+ip route vrf Mgmt-vrf 0.0.0.0 0.0.0.0 10.29.47.1
+ip route 0.0.0.0 0.0.0.0 dhcp
+ipv6 access-list l3-v6-acl
+  sequence 1 remark meraki-acl
+  sequence 2 permit icmp any any
+  sequence 3 permit ipv6 any any
+radius server 172.28.27.40_1812_0
+  address ipv4 172.28.27.40 auth-port 1812 acct-port 0
+  key 7 05080F1C22431F5B4A
+netconf-yang
+ntp server FD0A:9B09:1F7:1:ED03:C53C:32D7:4979
+device-tracking binding reachable-lifetime 3600 stale-lifetime 7200 down-lifetime 14400
+        """
+        config_2 = """
+flow record TA1-noavc-v4-in
+  description ta1_noavc_ingress
+  match flow direction
+  match interface input
+  match ipv4 source address
+  collect counter bytes long
+  collect counter packets long
+flow monitor TA1-noavc-v4-out
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-noavc-v4-out
+flow monitor TA1-v4-in
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-v4-in
+flow monitor TA1-v4-out
+  exporter TA1
+  cache timeout inactive 300
+  cache timeout active 300
+  record TA1-v4-out
+flow file-export default
+  file max-count 2
+  file max-create-interval 5
+  no file header option-data
+  no metadata producer netflowStatistics
+  no metadata producer deviceInfo
+  no metadata producer statsLoggerWdavc
+  no metadata producer intfQosStats
+  no metadata producer intfStats
+  no metadata producer fnfMonitorStats
+service-template aaa-unreachable-flag
+service-template bounce-port-flag
+service-template eap-seen
+service-template DEFAULT_LINKSEC_POLICY_MUST_SECURE
+  linksec policy must-secure
+service-template DEFAULT_LINKSEC_POLICY_SHOULD_SECURE
+  linksec policy should-secure
+service-template DEFAULT_CRITICAL_VOICE_TEMPLATE
+  voice vlan
+service-template DEFAULT_CRITICAL_DATA_TEMPLATE
+service-template secure-connect-ap-aaa-down
+service-template secure-connect-break-flag
+service-template secure-connect-failed-flag
+service-template secure-connect-in-progress-flag
+service-template secure-connect-success-flag
+dot1x system-auth-control
+username admin autocommand exit
+username meraki-tdluser secret 9 $9$bxyCQRkMW7/jcV$7lyZFWDgXROwmZjjTj0Bf32mVzahq/aE6fNqe.00bFs
+redundancy
+  mode sso
+ip route vrf Mgmt-vrf 0.0.0.0 0.0.0.0 10.29.47.1
+ip route 0.0.0.0 0.0.0.0 dhcp
+ip dns server
+radius server 172.28.27.40_1812_0
+  address ipv4 172.28.27.40 auth-port 1812 acct-port 0
+  key 7 05080F1C22431F5B4A
+ipv6 access-list l3-v6-acl
+  sequence 1 remark meraki-acl
+  sequence 2 permit icmp any any
+  sequence 3 permit ipv6 any any
+ntp server FD0A:9B09:1F7:1:ED03:C53C:32D7:4979
+device-tracking binding reachable-lifetime 3600 stale-lifetime 7200 down-lifetime 14400
+netconf-yang
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
