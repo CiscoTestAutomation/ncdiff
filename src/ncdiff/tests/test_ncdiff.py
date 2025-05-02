@@ -1500,8 +1500,7 @@ class TestNcDiff(unittest.TestCase):
             # Create operation at tracking or logging, which are non-presence
             # containers, is not allowed as per confd implementation although
             # the expected behavior is ambiguous in RFC7950. More discussion
-            # can be found in the Tail-F ticket PS-47089:
-            # https://sedona.atlassian.net/servicedesk/customer/portal/4/PS-47089
+            # can be found in the Tail-F ticket PS-47089.
             (delta1, "/nc:config/jon:tracking/jon:logging/jon:local"),
         ]
         for delta, xpath in verification:
