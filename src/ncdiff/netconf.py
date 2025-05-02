@@ -1255,10 +1255,13 @@ class NetconfCalculator(BaseCalculator):
         '''
 
         schema_node = self.device.get_schema_node(node)
+
+        # Create operation on non-presence containers is not allowed as per
+        # ConfD implementation although the expected behavior is ambiguous in
+        # RFC7950. More discussion can be found in the Tail-F ticket PS-47089.
         if (
             schema_node.get('type') == 'container' and
-            schema_node.get('presence') != 'true' and
-            len(self.device.default_in_use(schema_node)) > 0
+            schema_node.get('presence') != 'true'
         ):
             for child in node:
                 self.set_create_operation(child)

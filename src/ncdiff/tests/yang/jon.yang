@@ -69,7 +69,7 @@ module jon {
 
   leaf-list store {
     ordered-by user;
-    default "Target";
+    type string;
   }
 
   container location {
