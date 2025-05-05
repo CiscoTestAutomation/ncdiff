@@ -31,6 +31,8 @@ SHORT_NO_COMMANDS = [
 # These cases can be recorded here.
 COEXIST_SHORT_POSITIVE_COMMANDS = [
     'snmp-server manager',
+    'ip multicast-routing',
+    'ip dhcp relay information option',
 ]
 
 # Some commands are orderless, e.g., "show running-config" output could be:
