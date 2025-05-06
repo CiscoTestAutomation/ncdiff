@@ -1836,3 +1836,26 @@ netconf-yang
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_aaa_attribute_list(self):
+        config_1 = """
+aaa attribute list TESTLIST2
+  attribute type wlan-vlan-id test
+aaa attribute list TESTLIST1
+  attribute type autocmd ATRVAL1
+        """
+        config_2 = """
+aaa attribute list TESTLIST1
+  attribute type autocmd ATRVAL1
+aaa attribute list TESTLIST2
+  attribute type wlan-vlan-id test
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
