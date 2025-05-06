@@ -1263,8 +1263,13 @@ class NetconfCalculator(BaseCalculator):
             schema_node.get('type') == 'container' and
             schema_node.get('presence') != 'true'
         ):
+            default_xpaths = [self.device.get_xpath(n)
+                              for n in self.device.default_in_use(schema_node)]
             for child in node:
-                self.set_create_operation(child)
+                child_xpath = self.device.get_xpath(
+                    self.device.get_schema_node(child))
+                if child_xpath not in default_xpaths:
+                    self.set_create_operation(child)
         else:
             node.set(operation_tag, 'create')
 

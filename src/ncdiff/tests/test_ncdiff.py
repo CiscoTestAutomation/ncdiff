@@ -1521,6 +1521,68 @@ class TestNcDiff(unittest.TestCase):
                     f"but got the delta {delta.nc} instead.",
                 )
 
+    def test_delta_14(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                  <other-info>
+                    <geo-facts>
+                      <code>ON</code>
+                    </geo-facts>
+                  </other-info>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta = config2 - config1
+        delta.preferred_create = "create"
+        verification = [
+            # Create operation at "other-info" is not allowed as it is a NP
+            # container.
+            "/nc:config/jon:location/jon:other-info",
+
+            # Create operation at "geo-facts" is not allowed as it is a NP
+            # container.
+            "/nc:config/jon:location/jon:other-info/jon:geo-facts",
+
+            # Create operation at "code" is not allowed as it has default in
+            # use.
+            "/nc:config/jon:location/jon:other-info/jon:geo-facts/jon:code",
+        ]
+        for xpath in verification:
+            nodes = delta.nc.xpath(
+                xpath,
+                namespaces=delta.ns)
+            self.assertEqual(
+                len(nodes),
+                1,
+                f"Expected to find xpath '{xpath}' in delta "
+                f"but the delta is {delta}",
+            )
+            for node in nodes:
+                self.assertIsNone(
+                    node.get(operation_tag),
+                    f"Expected there is no 'create' operation at {xpath} "
+                    f"but got the delta {delta} instead.",
+                )
+
     def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
