@@ -1859,3 +1859,52 @@ aaa attribute list TESTLIST2
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_coexist_short_positive_commands_1(self):
+        config_1 = """
+ip routing
+!
+        """
+        config_2 = """
+ip routing
+!
+ip multicast-routing
+ip multicast-routing vrf green
+ip multicast-routing vrf blue
+        """
+        expected_lines = [
+            'ip multicast-routing',
+            'ip multicast-routing vrf blue',
+            'ip multicast-routing vrf green',
+        ]
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        clis = running_diff.cli.splitlines()
+        for expected_line in expected_lines:
+            self.assertIn(expected_line, clis,
+                          f'CLI "{expected_line}" is missing')
+
+    def test_coexist_short_positive_commands_2(self):
+        config_1 = """
+ip domain name cisco.com
+!
+        """
+        config_2 = """
+ip domain name cisco.com
+ip dhcp relay information option vpn
+ip dhcp relay information option
+        """
+        expected_lines = [
+            'ip dhcp relay information option vpn',
+            'ip dhcp relay information option',
+        ]
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        clis = running_diff.cli.splitlines()
+        for expected_line in expected_lines:
+            self.assertIn(expected_line, clis,
+                          f'CLI "{expected_line}" is missing')
