@@ -354,7 +354,6 @@ class NetconfCalculator(BaseCalculator):
 
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
-                                       {operation_tag: self.preferred_delete},
                                        nsmap=child_other.nsmap)
             siblings = list(node_self.iterchildren(tag=child_other.tag))
             if siblings:
@@ -363,14 +362,24 @@ class NetconfCalculator(BaseCalculator):
                 node_self.append(child_self)
             s_node = self.device.get_schema_node(child_other)
             if s_node.get('type') == 'leaf-list':
+                child_self.set(operation_tag, self.preferred_delete)
                 self._merge_text(child_other, child_self)
             elif s_node.get('type') == 'list':
+                child_self.set(operation_tag, self.preferred_delete)
                 keys = self._get_list_keys(s_node)
                 for key in keys:
                     key_node = child_other.find(key)
                     e = etree.SubElement(
                         child_self, key, nsmap=key_node.nsmap)
                     e.text = key_node.text
+            elif (
+                s_node.get('type') == 'container' and
+                s_node.get('presence') != 'true' and
+                self.preferred_delete == 'delete'
+            ):
+                self.set_delete_operation(child_self, child_other)
+            else:
+                child_self.set(operation_tag, self.preferred_delete)
 
         for child_self, child_other in in_s_and_in_o:
             child_self.set(operation_tag, 'replace')
@@ -1068,7 +1077,6 @@ class NetconfCalculator(BaseCalculator):
         choice_nodes = {}
         for child_self in in_s_not_in_o:
             child_other = etree.Element(child_self.tag,
-                                        {operation_tag: self.preferred_delete},
                                         nsmap=child_self.nsmap)
             if self.diff_type == 'replace':
                 child_self.set(operation_tag, 'replace')
@@ -1086,8 +1094,10 @@ class NetconfCalculator(BaseCalculator):
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
                     ordered_by_user[s_node.tag] = 'leaf-list'
+                child_other.set(operation_tag, self.preferred_delete)
                 self._merge_text(child_self, child_other)
             elif s_node.get('type') == 'list':
+                child_other.set(operation_tag, self.preferred_delete)
                 keys = self._get_list_keys(s_node)
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
@@ -1097,13 +1107,20 @@ class NetconfCalculator(BaseCalculator):
                     e = etree.SubElement(
                         child_other, key, nsmap=key_node.nsmap)
                     e.text = key_node.text
+            elif (
+                s_node.get('type') == 'container' and
+                s_node.get('presence') != 'true' and
+                self.preferred_delete == 'delete'
+            ):
+                self.set_delete_operation(child_other, child_self)
+            else:
+                child_other.set(operation_tag, self.preferred_delete)
             if s_node.getparent().get('type') == 'case':
                 # key: choice node, value: case node
                 choice_nodes[s_node.getparent().getparent()] = \
                     s_node.getparent()
         for child_other in in_o_not_in_s:
             child_self = etree.Element(child_other.tag,
-                                       {operation_tag: self.preferred_delete},
                                        nsmap=child_other.nsmap)
             if self.preferred_create == 'replace':
                 child_other.set(operation_tag, self.preferred_create)
@@ -1130,8 +1147,10 @@ class NetconfCalculator(BaseCalculator):
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
                     ordered_by_user[s_node.tag] = 'leaf-list'
+                child_self.set(operation_tag, self.preferred_delete)
                 self._merge_text(child_other, child_self)
             elif s_node.get('type') == 'list':
+                child_self.set(operation_tag, self.preferred_delete)
                 keys = self._get_list_keys(s_node)
                 if s_node.get('ordered-by') == 'user' and \
                    s_node.tag not in ordered_by_user:
@@ -1140,6 +1159,14 @@ class NetconfCalculator(BaseCalculator):
                     key_node = child_other.find(key)
                     e = etree.SubElement(child_self, key, nsmap=key_node.nsmap)
                     e.text = key_node.text
+            elif (
+                s_node.get('type') == 'container' and
+                s_node.get('presence') != 'true' and
+                self.preferred_delete == 'delete'
+            ):
+                self.set_delete_operation(child_self, child_other)
+            else:
+                child_self.set(operation_tag, self.preferred_delete)
         for child_self, child_other in in_s_and_in_o:
             s_node = self.device.get_schema_node(child_self)
             if s_node.get('type') == 'leaf':
@@ -1272,6 +1299,56 @@ class NetconfCalculator(BaseCalculator):
                     self.set_create_operation(child)
         else:
             node.set(operation_tag, 'create')
+
+    def set_delete_operation(self, node, reference_node):
+        '''set_delete_operation
+        Low-level api: Set the `operation` attribute of a node to `delete` when
+        it is not already set. This method is used when the preferred_delete is
+        `delete`.
+        Parameters
+        ----------
+        node : `Element`
+            A config node in a config tree. `delete` operation will be set on
+            descendants of this node.
+        reference_node : `Element`
+            A config node in a config tree as a reference when building the
+            input parameter `node`. This node has descendants that `node` does
+            not have.
+        Returns
+        -------
+        None
+            There is no return of this method.
+        '''
+
+        # Delete operation on non-presence containers is allowed even there is
+        # nothing inside the non-presence container as per ConfD implementation
+        # although the expected behavior is ambiguous in RFC7950. More
+        # discussion can be found in the Tail-F ticket PS-47089. In negative
+        # testing case, if we want the delete operation to be rejected when
+        # there is nothing inside the non-presence container, we have to put
+        # delete operations on the descendants of the non-presence container,
+        # which are not non-presence containers.
+        for reference_child in reference_node:
+            child = etree.SubElement(node, reference_child.tag,
+                                     nsmap=reference_child.nsmap)
+            schema_node = self.device.get_schema_node(reference_child)
+            if schema_node.get('type') == 'leaf-list':
+                child.set(operation_tag, 'delete')
+                self._merge_text(reference_child, child)
+            elif schema_node.get('type') == 'list':
+                child.set(operation_tag, 'delete')
+                keys = self._get_list_keys(schema_node)
+                for key in keys:
+                    key_node = reference_child.find(key)
+                    e = etree.SubElement(child, key, nsmap=key_node.nsmap)
+                    e.text = key_node.text
+            elif (
+                schema_node.get('type') == 'container' and
+                schema_node.get('presence') != 'true'
+            ):
+                self.set_delete_operation(child, reference_child)
+            else:
+                child.set(operation_tag, 'delete')
 
     @staticmethod
     def _url_to_prefix(node, id):

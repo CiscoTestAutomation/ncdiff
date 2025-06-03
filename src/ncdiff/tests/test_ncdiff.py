@@ -457,7 +457,7 @@ class TestNcDiff(unittest.TestCase):
   <interfaces xmlns="http://openconfig.net/yang/interfaces">
     <interface>
       <name>GigabitEthernet1/0/1</name>
-      <ethernet xmlns="http://openconfig.net/yang/interfaces/ethernet" nc:operation="delete"/>
+      <ethernet xmlns="http://openconfig.net/yang/interfaces/ethernet" nc:operation="remove"/>
     </interface>
   </interfaces>
 </nc:config>
@@ -467,6 +467,7 @@ class TestNcDiff(unittest.TestCase):
         delta1 = config2 - config1
         delta2 = config1 - config2
         self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        delta2.preferred_delete = "remove"
         self.assertEqual(str(delta2).strip(), expected_delta2.strip())
 
     def test_delta_2(self):
@@ -554,9 +555,9 @@ class TestNcDiff(unittest.TestCase):
       <bgp xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-bgp">
         <id>10</id>
         <bgp>
-          <listen nc:operation="delete"/>
+          <listen nc:operation="remove"/>
         </bgp>
-        <address-family nc:operation="delete"/>
+        <address-family nc:operation="remove"/>
       </bgp>
     </router>
   </native>
@@ -567,6 +568,7 @@ class TestNcDiff(unittest.TestCase):
         delta1 = config2 - config1
         delta2 = -delta1
         self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        delta2.preferred_delete = "remove"
         self.assertEqual(str(delta2).strip(), expected_delta2.strip())
 
     def test_delta_3(self):
@@ -1106,7 +1108,7 @@ class TestNcDiff(unittest.TestCase):
     <interface>
       <Tunnel>
         <name>5</name>
-        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel" nc:operation="delete"/>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel" nc:operation="remove"/>
       </Tunnel>
     </interface>
   </native>
@@ -1135,6 +1137,7 @@ class TestNcDiff(unittest.TestCase):
         delta1 = config2 - config1
         delta2 = config1 - config2
         delta3 = no_choice - config1
+        delta3.preferred_delete = "remove"
         delta4 = config1 - no_choice
         delta5 = config3 - config2
         delta6 = config2 - config3
@@ -1580,6 +1583,63 @@ class TestNcDiff(unittest.TestCase):
                 self.assertIsNone(
                     node.get(operation_tag),
                     f"Expected there is no 'create' operation at {xpath} "
+                    f"but got the delta {delta} instead.",
+                )
+
+    def test_delta_15(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <location xmlns="urn:jon">
+                  <alberta>
+                    <name>Calgary</name>
+                  </alberta>
+                  <other-info>
+                    <geo-facts>
+                      <code>ON</code>
+                    </geo-facts>
+                  </other-info>
+                </location>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta = config1 - config2
+        verification = [
+            # Delete operation at "other-info" is not ideal as it is a NP
+            # container.
+            "/nc:config/jon:location/jon:other-info",
+
+            # Delete operation at "geo-facts" is not ideal as it is a NP
+            # container.
+            "/nc:config/jon:location/jon:other-info/jon:geo-facts",
+        ]
+        for xpath in verification:
+            nodes = delta.nc.xpath(
+                xpath,
+                namespaces=delta.ns)
+            self.assertEqual(
+                len(nodes),
+                1,
+                f"Expected to find xpath '{xpath}' in delta "
+                f"but the delta is {delta}",
+            )
+            for node in nodes:
+                self.assertIsNone(
+                    node.get(operation_tag),
+                    f"Expected there is no 'delete' operation at {xpath} "
                     f"but got the delta {delta} instead.",
                 )
 
