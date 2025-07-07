@@ -624,22 +624,20 @@ class RunningConfigDiff(object):
 
     @staticmethod
     def handle_orderless(list1, list2, depth):
-        # Find common lines that are orderless
-        lines1 = [i[0] for i in list1]
+        # Find lines that are orderless
+        lines_list1 = [i[0] for i in list1]
+        lines_list2 = [i[0] for i in list2]
         matches = {}
         for idx, item in enumerate(list2):
             result, match_type = RunningConfigDiff.match_orderless(item[0],
                                                                    depth)
-            if result and item[0] in lines1:
+            if result and item[0] in lines_list1:
                 matches[item[0]] = match_type, idx
 
-        # Romove common lines from list1 and save them in removed_items
-        type_start_idx = {}
+        # Romove orderless lines from list1 and save them in removed_items
         to_be_removed = []
-        for idx, line in enumerate(lines1):
+        for idx, line in enumerate(lines_list1):
             if line in matches:
-                if matches[line][0] not in type_start_idx:
-                    type_start_idx[matches[line][0]] = idx
                 to_be_removed.append(idx)
         removed_items = {}
         for idx in reversed(to_be_removed):
@@ -656,24 +654,86 @@ class RunningConfigDiff(object):
                 previous_idx_1 += lines1[previous_idx_1:].index(line2) + 1
                 previous_idx_2 += lines2[previous_idx_2:].index(line2) + 1
                 common_lines.append((previous_idx_1 - 1, previous_idx_2 - 1))
+        lines_common = [list1[i[0]][0] for i in common_lines]
 
-        # Insert common lines back to list1
+        # Insert orderless lines back to list1
+        lines_orderless1 = list(matches.keys())
         offset_idx_1 = 0
-        previous_idx_2 = 0
-        for line, (line_type, list2_idx) in matches.items():
-            common_idx_1 = 0
-            if len(common_lines) > 0 and list2_idx > common_lines[0][1]:
-                for i, j in common_lines:
-                    # if previous_idx_2 <= j and j < list2_idx:
-                    if j < list2_idx:
-                        common_idx_1 = i + 1
-                        previous_idx_2 = j
-                    if j > list2_idx:
-                        break
-            start_idx = max(common_idx_1 + offset_idx_1,
-                            type_start_idx[line_type])
-            list1.insert(start_idx, removed_items[line])
-            offset_idx_1 = start_idx - common_idx_1 + 1
+        offset_idx_2 = 0
+        inserted = []
+        last_anchor_2 = None
+        for line in lines_list1:
+
+            # Is orderless
+            if line in lines_orderless1:
+                if line in inserted:
+                    continue
+
+                last_anchor_line = lines_list2[last_anchor_2] \
+                    if last_anchor_2 is not None else None
+                num_lines = len(lines_common)
+                next_anchor_line = lines_common[
+                    lines_common.index(last_anchor_line) + 1
+                    if last_anchor_line is not None else 0
+                ] if (
+                    last_anchor_line is None and
+                    num_lines > 0
+                ) or (
+                    last_anchor_line is not None and
+                    num_lines > lines_common.index(last_anchor_line) + 1
+                ) else None
+                next_anchor_2 = lines_list2.index(next_anchor_line) \
+                    if next_anchor_line is not None else None
+                last_anchor_1 = lines_list1.index(last_anchor_line) \
+                    if last_anchor_line is not None else None
+                next_anchor_1 = lines_list1.index(next_anchor_line) \
+                    if next_anchor_line is not None else None
+
+                if line in lines_list2[last_anchor_2:next_anchor_2]:
+                    for line_2 in [
+                        i for i in lines_list2[
+                            offset_idx_2:lines_list2.index(line) + 1
+                        ] if i in lines_orderless1 and
+                        i in lines_list1[last_anchor_1:next_anchor_1] and
+                        i not in inserted
+                    ]:
+                        list1.insert(offset_idx_1, removed_items[line_2])
+                        inserted.append(line_2)
+                        offset_idx_1 += 1
+                    offset_idx_2 = lines_list2.index(line) + 1
+                else:
+                    list1.insert(offset_idx_1, removed_items[line])
+                    inserted.append(line)
+                    offset_idx_1 += 1
+
+            # Is not orderless
+            else:
+                if line in lines_common:
+                    this_anchor_2 = lines_list2.index(line)
+                    this_anchor_1 = lines_list1.index(line)
+                    if offset_idx_2 <= this_anchor_2:
+                        for line_2 in [
+                            i for i in lines_list2[
+                                offset_idx_2:this_anchor_2
+                            ] if i in lines_orderless1 and
+                            i in lines_list1[offset_idx_1:this_anchor_1] and
+                            i not in inserted
+                        ]:
+                            list1.insert(offset_idx_1, removed_items[line_2])
+                            inserted.append(line_2)
+                            offset_idx_1 += 1
+                    offset_idx_1 = [i[0] for i in list1].index(line) + 1
+                    offset = lines_list2.index(line) + 1
+                    if offset > offset_idx_2:
+                        offset_idx_2 = offset
+                    last_anchor_2 = this_anchor_2
+                else:
+                    offset_idx_1 = [i[0] for i in list1].index(line) + 1
+        for line_2 in [i for i in lines_list2[
+            offset_idx_2:
+        ] if i in lines_orderless1 and i not in inserted]:
+            list1.insert(offset_idx_1, removed_items[line_2])
+            offset_idx_1 += 1
 
         # Find common lines that have children
         lines1 = {item[0]: idx for idx, item in enumerate(list1)
