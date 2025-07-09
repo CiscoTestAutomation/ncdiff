@@ -1692,6 +1692,132 @@ ipv6 pim vrf green register-source Loopback201
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_ip_route(self):
+        config_1 = """
+router ospfv3 22
+ !
+ address-family ipv6 unicast vrf ospfv3-vrf
+ exit-address-family
+!
+router bgp 10
+ bgp log-neighbor-changes
+ !
+ address-family ipv4 vrf ospfv3-vrf
+ exit-address-family
+ !
+ address-family ipv6 vrf ospfv3-vrf
+  redistribute ospf 22
+ exit-address-family
+!
+ip forward-protocol nd
+ip forward-protocol udp
+ip tcp RST-count 10 RST-window 5000
+!
+ip http server
+ip http authentication local
+ip http secure-server
+ip tftp blocksize 8192
+ip route 0.0.0.0 0.0.0.0 10.104.251.1
+ip ssh bulk-mode 131072
+!
+logging trap informational
+!
+control-plane
+!
+mgcp behavior rsip-range tgcp-only
+mgcp behavior comedia-role none
+mgcp behavior comedia-check-media-src disable
+mgcp behavior comedia-sdp-force disable
+!
+mgcp profile default
+!
+line con 0
+ exec-timeout 0 0
+ activation-character 13
+ stopbits 1
+line aux 0
+ activation-character 13
+line vty 0 4
+ exec-timeout 0 0
+ activation-character 13
+ transport input ssh
+!
+netconf ssh
+!
+netconf-yang
+yang-interfaces feature deprecated disable
+end
+        """
+        config_2 = """
+router bgp 10
+ bgp log-neighbor-changes
+ !
+ address-family ipv4 vrf ospfv3-vrf
+ exit-address-family
+ !
+ address-family ipv6 vrf ospfv3-vrf
+ exit-address-family
+!
+ip forward-protocol nd
+ip forward-protocol udp
+ip tcp RST-count 10 RST-window 5000
+!
+ip http server
+ip http authentication local
+ip http secure-server
+ip tftp blocksize 8192
+ip route 0.0.0.0 0.0.0.0 10.104.251.1
+ip ssh bulk-mode 131072
+!
+logging trap informational
+!
+control-plane
+!
+mgcp behavior rsip-range tgcp-only
+mgcp behavior comedia-role none
+mgcp behavior comedia-check-media-src disable
+mgcp behavior comedia-sdp-force disable
+!
+mgcp profile default
+!
+line con 0
+ exec-timeout 0 0
+ activation-character 13
+ stopbits 1
+line aux 0
+ activation-character 13
+line vty 0 4
+ exec-timeout 0 0
+ activation-character 13
+ transport input ssh
+!
+netconf ssh
+!
+netconf-yang
+yang-interfaces feature deprecated disable
+end
+        """
+        expected_diff = """
+- router ospfv3 22
+-   address-family ipv6 unicast vrf ospfv3-vrf
+-     exit-address-family
+  router bgp 10
+    address-family ipv6 vrf ospfv3-vrf
+-     redistribute ospf 22
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertTrue(running_diff)
+        actual_diff = str(running_diff).strip()
+        expected_diff = expected_diff.strip()
+        actual_lines = actual_diff.split('\n')
+        expected_lines = expected_diff.split('\n')
+        self.assertEqual(len(actual_lines), len(expected_lines))
+        for actual_line, expected_line in zip(actual_lines, expected_lines):
+            self.assertEqual(actual_line.strip(), expected_line.strip())
+
     def test_mix_cli_1(self):
         config_1 = """
 flow file-export default
