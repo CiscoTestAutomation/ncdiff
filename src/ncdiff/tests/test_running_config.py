@@ -1986,6 +1986,43 @@ aaa attribute list TESTLIST2
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_device_classifier(self):
+        config_1 = """
+device classifier condition ciscoap
+ mac Regex 70ca.9bd5.5fc4
+device classifier condition ipphone op AND
+ cdp tlv-type 6 value Regex IP
+ dhcp tlv-type 4 value Integer 2
+ mac Regex 001b.d4c6.b362
+device classifier device-type ciscoap
+ condition ciscoap
+device classifier device-type ipphone
+ condition ipphone
+device classifier
+        """
+        config_2 = """
+device classifier condition ipphone op AND
+ cdp tlv-type 6 value Regex IP
+ mac Regex 001b.d4c6.b362
+ dhcp tlv-type 4 value Integer 2
+device classifier condition ciscoap
+ mac Regex 70ca.9bd5.5fc4
+device classifier device-type ipphone
+ condition ipphone
+device classifier device-type ciscoap
+ condition ciscoap
+device classifier
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_coexist_short_positive_commands_1(self):
         config_1 = """
 ip routing
