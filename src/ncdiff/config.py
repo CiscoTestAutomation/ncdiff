@@ -82,6 +82,7 @@ class Config(object):
             raise TypeError("argument 'config' must be None, XML string, "
                             "or Element, but not '{}'"
                             .format(type(config)))
+        self.trim_defaults()
         if validate:
             self.validate_config()
 
@@ -249,6 +250,20 @@ class Config(object):
 
         return self.device.get_model_name(node)
 
+    def trim_defaults(self):
+        '''trim_defaults
+
+        High-level api: Trim default values in config.
+
+        Returns
+        -------
+
+        None
+            There is no return of this method.
+        '''
+
+        self._trim_defaults(self.ele)
+
     def validate_config(self):
         '''validate_config
 
@@ -269,39 +284,7 @@ class Config(object):
         '''
 
         self.roots
-        for child in self.ele:
-            child_schema_node = self.device.get_schema_node(child)
-
-            if len(child) > 0:
-                self._validate_node(child)
-
-            # clean up empty NP containers
-            if (
-                len(child) == 0 and
-                child_schema_node.get('type') == 'container' and
-                child_schema_node.get('presence') != 'true'
-            ):
-                self.ele.remove(child)
-
-            # cleanup empty list instance
-            elif (
-                len(child) == 0 and
-                child_schema_node.get('type') == 'list'
-            ):
-                logger.debug(
-                    "empty list entry {} under {} is pruned"
-                    .format(child.tag,
-                            self.device.get_xpath(child.getparent())))
-                self.ele.remove(child)
-
-            # cleanup obsoleted or deprecated nodes
-            elif (
-                child_schema_node.get('status') == 'obsolete' or (
-                    child_schema_node.get('status') == 'deprecated' and
-                    self.remove_deprecated
-                )
-            ):
-                self.ele.remove(child)
+        self._validate_node(self.ele)
 
     def ns_help(self):
         '''ns_help
@@ -364,6 +347,93 @@ class Config(object):
                 config.ele = etree.Element(config_tag, nsmap={'nc': nc_url})
         return config
 
+    def _trim_defaults(self, node):
+        '''_trim_defaults
+
+        Low-level api: Trim default values in config. This is a recursive
+        method.
+
+        Parameters
+        ----------
+
+        node : `Element`
+            A node to be processed.
+
+        Returns
+        -------
+
+        None
+            There is no return of this method.
+        '''
+
+        leaf_list_defaults = {}
+        for child in node:
+
+            child_schema_node = self.device.get_schema_node(child)
+            if child_schema_node is None:
+                raise ConfigError("schema node of the config node {} cannot "
+                                  "be found:\n{}"
+                                  .format(self.device.get_xpath(child), self))
+
+            if len(child) > 0:
+                self._trim_defaults(child)
+
+            # clean up empty NP containers
+            if (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'container' and
+                child_schema_node.get('presence') != 'true'
+            ):
+                node.remove(child)
+
+            # cleanup empty list instance
+            elif (
+                len(child) == 0 and
+                child_schema_node.get('type') == 'list'
+            ):
+                logger.debug(
+                    "empty list entry {} under {} is pruned"
+                    .format(child.tag,
+                            self.device.get_xpath(child.getparent())))
+                node.remove(child)
+
+            # cleanup leaf with default value
+            # TBD: the leaf's type has a default value and the leaf is not
+            # mandatory.
+            elif (
+                child_schema_node.get('type') == 'leaf' and
+                child_schema_node.get('default') is not None and
+                child.text == child_schema_node.get('default')
+            ):
+                node.remove(child)
+
+            # mark leaf-list that has default values
+            # TBD: if the leaf-list's type has a default value and the
+            # leaf-list does not have a "min-elements" statement with a value
+            # greater than or equal to one.
+            elif (
+                child_schema_node.get('type') == 'leaf-list' and
+                child_schema_node.get('default') is not None and
+                child.tag not in leaf_list_defaults
+            ):
+                defaults = child_schema_node.get('default').split(',')
+                values = [n.text for n in node.findall(child.tag)]
+                if (
+                    child_schema_node.get('ordered-by', 'system') == 'user' and
+                    values == defaults or
+                    child_schema_node.get('ordered-by', 'system') == 'system' and
+                    set(values) == set(defaults)
+                ):
+                    leaf_list_defaults[child.tag] = True
+                else:
+                    leaf_list_defaults[child.tag] = False
+
+        # cleanup leaf-list with default values
+        for tag in leaf_list_defaults:
+            if leaf_list_defaults[tag]:
+                for child in node.findall(tag):
+                    node.remove(child)
+
     def _validate_node(self, node):
         '''_validate_node
 
@@ -383,22 +453,25 @@ class Config(object):
             There is no return of this method.
         '''
 
-        c = Composer(self.device, node)
-        if c.schema_node is None:
-            p = self.device.get_xpath(node, instance=False)
-            raise ConfigError('schema node of the config node not '
-                              'found: {}'.format(p))
-        if c.schema_node.get('type') == 'list':
-            for key in c.keys:
-                if node.find(key) is None:
-                    p = self.device.get_xpath(node, instance=False)
-                    raise ConfigError("missing key '{}' of the config "
-                                      "node {}".format(key, p))
-        for tag in operation_tag, insert_tag, value_tag, key_tag:
-            if node.get(tag):
-                raise ConfigError("the config node contains invalid "
-                                  "attribute '{}': {}"
-                                  .format(tag, self.device.get_xpath(node)))
+        # skip the root node
+        root_node = node.getroottree().getroot()
+        if node.tag != root_node.tag:
+            c = Composer(self.device, node)
+            if c.schema_node is None:
+                p = self.device.get_xpath(node, instance=False)
+                raise ConfigError('schema node of the config node not '
+                                  'found: {}'.format(p))
+            if c.schema_node.get('type') == 'list':
+                for key in c.keys:
+                    if node.find(key) is None:
+                        p = self.device.get_xpath(node, instance=False)
+                        raise ConfigError("missing key '{}' of the config "
+                                          "node {}".format(key, p))
+            for tag in operation_tag, insert_tag, value_tag, key_tag:
+                if node.get(tag):
+                    raise ConfigError("the config node contains invalid "
+                                      "attribute '{}': {}"
+                                      .format(tag, self.device.get_xpath(node)))
 
         for child in node:
 
