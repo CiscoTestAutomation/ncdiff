@@ -132,4 +132,52 @@ module jon {
       }
     }
   }
+
+  container errdisable {
+    description
+      "Error disable";
+    container detect {
+      description
+        "Error disable detection";
+      container cause-config {
+        description
+          "Enable error disable detection for application";
+        leaf sfp-config-mismatch {
+          description
+            "Enable error detection on SFP config mismatch";
+          type boolean;
+          default "true";
+        }
+        leaf small-frame {
+          description
+            "Enable error detection on small_frame";
+          type boolean;
+          default "true";
+        }
+        leaf loopdetect {
+          description
+            "Enable error detection on loop detect";
+          type boolean;
+          default "true";
+        }
+        leaf-list leaflist1 {
+          description
+            "Enable error detection on leaflist1";
+          type string;
+          ordered-by user;
+          default "abc";
+          default "def";
+          default "ghi";
+        }
+        leaf-list leaflist2 {
+          description
+            "Enable error detection on leaflist2";
+          type string;
+          default "abc";
+          default "def";
+          default "ghi";
+        }
+      }
+    }
+  }
 }

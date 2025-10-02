@@ -1138,9 +1138,9 @@ class ModelCompiler(object):
         sm = child.search_one('status')
         if sm is not None and sm.arg in ['deprecated', 'obsolete']:
             n.set('status', sm.arg)
-        sm = child.search_one('default')
-        if sm is not None:
-            n.set('default', sm.arg)
+        sm = child.search('default')
+        if sm is not None and len(sm) > 0:
+            n.set('default', ",".join(map(lambda x: x.arg, sm)))
         if child.keyword == 'list':
             sm = child.search_one('key')
             if sm is not None:

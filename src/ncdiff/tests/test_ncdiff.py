@@ -1643,13 +1643,132 @@ class TestNcDiff(unittest.TestCase):
                     f"but got the delta {delta} instead.",
                 )
 
+    def test_delta_16(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <errdisable xmlns="urn:jon">
+                  <detect>
+                    <cause-config>
+                      <leaflist1>def</leaflist1>
+                      <leaflist1>abc</leaflist1>
+                    </cause-config>
+                  </detect>
+                </errdisable>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="urn:uuid:1052caa9-92fa-4932-b931-945eb37d8915">
+              <data>
+                <errdisable xmlns="urn:jon">
+                  <detect>
+                    <cause-config>
+                      <loopdetect>true</loopdetect>
+                      <leaflist1>def</leaflist1>
+                      <leaflist2>def</leaflist2>
+                      <leaflist1>abc</leaflist1>
+                      <leaflist2>abc</leaflist2>
+                      <leaflist2>ghi</leaflist2>
+                      <leaflist1>ghi</leaflist1>
+                    </cause-config>
+                  </detect>
+                </errdisable>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta = config2 - config1
+        self.assertNotEqual(config1, config2)
+        verification = {
+            # loopdetect should be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:loopdetect": False,
+
+            # leaflist1 should not be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:leaflist1": True,
+
+            # leaflist2 should be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:leaflist2": False,
+        }
+        for xpath, result in verification.items():
+            nodes = config2.ele.xpath(
+                xpath,
+                namespaces=config2.ns)
+            self.assertEqual(
+                bool(nodes),
+                result,
+                f"Expected that finding xpath '{xpath}' in config2 is {result} "
+                f"but actually is {bool(nodes)}",
+            )
+
+
+    def test_delta_17(self):
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <errdisable xmlns="urn:jon">
+                  <detect>
+                    <cause-config>
+                      <leaflist2>def</leaflist2>
+                    </cause-config>
+                  </detect>
+                </errdisable>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="urn:uuid:1052caa9-92fa-4932-b931-945eb37d8915">
+              <data>
+                <errdisable xmlns="urn:jon">
+                  <detect>
+                    <cause-config>
+                      <loopdetect>false</loopdetect>
+                      <leaflist1>abc</leaflist1>
+                      <leaflist2>def</leaflist2>
+                      <leaflist1>def</leaflist1>
+                      <leaflist1>ghi</leaflist1>
+                      <leaflist2>abc</leaflist2>
+                    </cause-config>
+                  </detect>
+                </errdisable>
+              </data>
+            </rpc-reply>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta = config2 - config1
+        self.assertNotEqual(config1, config2)
+        verification = {
+            # loopdetect should not be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:loopdetect": True,
+
+            # leaflist1 should not be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:leaflist1": False,
+
+            # leaflist2 should be trimmed.
+            "/nc:config/jon:errdisable/jon:detect/jon:cause-config/jon:leaflist2": True,
+        }
+        for xpath, result in verification.items():
+            nodes = config2.ele.xpath(
+                xpath,
+                namespaces=config2.ns)
+            self.assertEqual(
+                bool(nodes),
+                result,
+                f"Expected that finding xpath '{xpath}' in config2 is {result} "
+                f"but actually is {bool(nodes)}",
+            )
+
     def test_delta_replace_1(self):
         config_xml1 = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
               <data>
                 <foo xmlns="urn:jon">abc</foo>
                 <tracking xmlns="urn:jon">
-                  <enabled>true</enabled>
+                  <enabled-v2>true</enabled-v2>
                 </tracking>
                 <address xmlns="urn:jon">
                   <last>Brown</last>
@@ -1680,7 +1799,7 @@ class TestNcDiff(unittest.TestCase):
               <data>
                 <foo xmlns="urn:jon">edf</foo>
                 <tracking xmlns="urn:jon">
-                  <enabled>false</enabled>
+                  <enabled-v2>false</enabled-v2>
                 </tracking>
                 <address xmlns="urn:jon">
                   <last>Brown</last>
@@ -1714,7 +1833,7 @@ class TestNcDiff(unittest.TestCase):
         tracking = delta.nc.xpath('//nc:config/jon:tracking',
                                   namespaces=delta.ns)[0]
         self.assertEqual(tracking.get(operation_tag), 'replace')
-        enabled = delta.nc.xpath('//nc:config/jon:tracking/jon:enabled',
+        enabled = delta.nc.xpath('//nc:config/jon:tracking/jon:enabled-v2',
                                  namespaces=delta.ns)[0]
         self.assertEqual(enabled.text, 'false')
 
@@ -1762,7 +1881,7 @@ class TestNcDiff(unittest.TestCase):
               <data>
                 <foo xmlns="urn:jon">abc</foo>
                 <tracking xmlns="urn:jon">
-                  <enabled>true</enabled>
+                  <enabled-v2>true</enabled-v2>
                 </tracking>
                 <address xmlns="urn:jon">
                   <last>Brown</last>
@@ -1793,7 +1912,7 @@ class TestNcDiff(unittest.TestCase):
               <data>
                 <foo xmlns="urn:jon">edf</foo>
                 <tracking xmlns="urn:jon">
-                  <enabled>false</enabled>
+                  <enabled-v2>false</enabled-v2>
                 </tracking>
                 <address xmlns="urn:jon">
                   <last>Brown</last>
@@ -1827,7 +1946,7 @@ class TestNcDiff(unittest.TestCase):
         # container tracking
         tracking = delta.nc.xpath('//nc:config/jon:tracking',
                                   namespaces=delta.ns)[0]
-        enabled = delta.nc.xpath('//nc:config/jon:tracking/jon:enabled',
+        enabled = delta.nc.xpath('//nc:config/jon:tracking/jon:enabled-v2',
                                  namespaces=delta.ns)[0]
         self.assertEqual(enabled.text, 'false')
         self.assertEqual(enabled.get(operation_tag), 'replace')
