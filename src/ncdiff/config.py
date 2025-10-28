@@ -1,4 +1,5 @@
 import re
+import random
 import pprint
 import logging
 from lxml import etree
@@ -629,13 +630,32 @@ class ConfigDelta(object):
     replace_xpath : `str`
         Specify the xpath of the node to be replaced when diff_type is
         'minimum-replace'. The default value of replace_xpath is None.
+
+    random_depth : `int`
+        Specify the depth of randomizing the order of sibling nodes in the
+        delta. The default value of random_depth is None, which means no
+        randomization. Consider roots in a YANG module are level 0, their
+        children are level 1, and so on so forth. By default, randomization is
+        not applied.
+
+    random_seed : `int`
+        Specify the seed of randomizing the order of sibling nodes in the
+        delta. The default value of random_seed is None, which means no seed is
+        set. The value of random_seed is always None if random_depth is None.
+        If random_depth is set but random_seed is None, a random seed will
+        be generated automatically. Specifying a random seed is useful for
+        reproducing test cases.
     '''
 
     def __init__(self, config_src, config_dst=None, delta=None,
                  preferred_create='merge',
                  preferred_replace='merge',
                  preferred_delete='delete',
-                 diff_type='minimum', replace_depth=0, replace_xpath=None):
+                 diff_type='minimum',
+                 replace_depth=0,
+                 replace_xpath=None,
+                 random_depth=None,
+                 random_seed=None):
         '''
         __init__ instantiates a ConfigDelta instance.
         '''
@@ -643,6 +663,15 @@ class ConfigDelta(object):
         self.diff_type = diff_type
         self.replace_depth = replace_depth
         self.replace_xpath = replace_xpath
+        if random_depth is None or (
+            isinstance(random_depth, int) and random_depth >= 0
+        ):
+            self.random_depth = random_depth
+        else:
+            raise ValueError("argument 'random_depth' must be a non-negative "
+                             "integer or None, but not {} '{}'"
+                             .format(type(random_depth), random_depth))
+        self._random_seed = random_seed
         if not isinstance(config_src, Config):
             raise TypeError("argument 'config_src' must be "
                             "yang.ncdiff.Config, but not '{}'"
@@ -691,7 +720,7 @@ class ConfigDelta(object):
 
     @property
     def nc(self):
-        return NetconfCalculator(
+        delta = NetconfCalculator(
             self.device,
             self.config_dst.ele, self.config_src.ele,
             preferred_create=self.preferred_create,
@@ -701,6 +730,9 @@ class ConfigDelta(object):
             replace_depth=self.replace_depth,
             replace_xpath=self.replace_xpath,
         ).sub
+        if self.random_depth is not None and self.random_seed is not None:
+            self.reorder(delta, self.random_seed, self.random_depth, 0)
+        return delta
 
     @property
     def ns(self):
@@ -717,6 +749,24 @@ class ConfigDelta(object):
         roots.update(self.config_src.roots)
         roots.update(self.config_dst.roots)
         return roots
+
+    @property
+    def random_seed(self):
+        return self._random_seed
+
+    @random_seed.setter
+    def random_seed(self, value):
+        if value is not None and not isinstance(value, int):
+            raise ValueError("argument 'random_seed' must be an integer "
+                             "or None, but not {} '{}'"
+                             .format(type(value), value))
+        if self.random_depth is None:
+            self._random_seed = None
+        else:
+            if value is None:
+                self._random_seed = random.randint(1000, 9999)
+            else:
+                self._random_seed = value
 
     def __str__(self):
         return etree.tostring(self.nc, encoding='unicode', pretty_print=True)
@@ -759,6 +809,46 @@ class ConfigDelta(object):
     def __ne__(self, other):
         _cmperror(self, other)
 
+    def reorder_children(self, node, seed):
+        '''
+        reorder_children
+
+        Randomly reorder child nodes of a given node.
+        '''
+
+        buffer = {i: j for i, j in enumerate(node)}
+        length = len(buffer)
+        num_keys = 0
+        for i in range(length):
+            schema_node = self.device.get_schema_node(buffer[i])
+            if schema_node.get('is_key') == "true":
+                num_keys += 1
+            else:
+                break
+        if length - num_keys == 2:
+            node.remove(buffer[num_keys])
+            node.append(buffer[num_keys])
+        elif length - num_keys > 2:
+            random.seed(seed)
+            old_sequence = list(range(num_keys, length))
+            new_sequence = random.sample(
+                range(num_keys, length), length - num_keys)
+            [node.remove(buffer[i]) for i in reversed(old_sequence)]
+            [node.append(buffer[i]) for i in new_sequence]
+
+
+    def reorder(self,node, seed, depth, current_depth):
+        '''
+        reorder
+
+        Randomly reorder descendant nodes of a given node at a given depth.
+        '''
+
+        if current_depth == depth:
+            self.reorder_children(node, seed)
+        else:
+            for child in node:
+                self.reorder(child, seed, depth, current_depth + 1)
 
 class ConfigCompatibility(object):
     '''ConfigCompatibility

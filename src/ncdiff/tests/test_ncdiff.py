@@ -2300,6 +2300,365 @@ class TestNcDiff(unittest.TestCase):
         )[0]
         self.assertEqual(destination.get(operation_tag), 'replace')
 
+    def test_delta_random_1(self):
+        # random sequence at level 4
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <mode>
+                          <ethernet-config>
+                            <gre>
+                              <ipv4/>
+                            </gre>
+                          </ethernet-config>
+                        </mode>
+                        <destination-config>
+                          <ipv4>1.1.1.1</ipv4>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+                       message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <Tunnel>
+                      <name>5</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <mode>
+                          <ethernet-config>
+                            <l2tpv3>
+                              <manual/>
+                            </l2tpv3>
+                          </ethernet-config>
+                        </mode>
+                        <destination-config>
+                          <host>hostname</host>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <host>hostname</host>
+          </destination-config>
+          <mode>
+            <ethernet-config>
+              <l2tpv3>
+                <manual/>
+              </l2tpv3>
+            </ethernet-config>
+          </mode>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <Tunnel>
+        <name>5</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <ipv4>1.1.1.1</ipv4>
+          </destination-config>
+          <mode>
+            <ethernet-config>
+              <gre>
+                <ipv4/>
+              </gre>
+            </ethernet-config>
+          </mode>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        delta1.random_depth = 4
+        delta1.random_seed = 2222
+        delta2.random_depth = 4
+        delta2.random_seed = None
+
+        self.assertEqual(delta1.random_seed, 2222)
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertGreaterEqual(delta2.random_seed, 0)
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+
+    def test_delta_random_2(self):
+        # random sequence at level 4
+        xml1 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.126</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>3</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>2</name>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <source>1.1.1.1</source>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        xml2 = """
+            <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101">
+              <data>
+                <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+                  <interface>
+                    <GigabitEthernet>
+                      <name>1</name>
+                      <ip>
+                        <address>
+                          <primary>
+                            <address>10.77.130.127</address>
+                            <mask>255.255.255.0</mask>
+                          </primary>
+                        </address>
+                      </ip>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>2</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>false</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <GigabitEthernet>
+                      <name>4</name>
+                      <shutdown/>
+                      <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+                        <auto>true</auto>
+                      </negotiation>
+                    </GigabitEthernet>
+                    <Tunnel>
+                      <name>3</name>
+                      <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
+                      <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+                        <destination-config>
+                          <ipv4>2.2.2.2</ipv4>
+                        </destination-config>
+                      </tunnel>
+                    </Tunnel>
+                  </interface>
+                </native>
+              </data>
+            </rpc-reply>
+            """
+        expected_delta1 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <GigabitEthernet>
+        <name>2</name>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>false</auto>
+        </negotiation>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>4</name>
+        <shutdown/>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>true</auto>
+        </negotiation>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>1</name>
+        <ip>
+          <address>
+            <primary>
+              <address>10.77.130.127</address>
+            </primary>
+          </address>
+        </ip>
+      </GigabitEthernet>
+      <GigabitEthernet nc:operation="delete">
+        <name>3</name>
+      </GigabitEthernet>
+      <Tunnel nc:operation="delete">
+        <name>2</name>
+      </Tunnel>
+      <Tunnel>
+        <name>3</name>
+        <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <ipv4>2.2.2.2</ipv4>
+          </destination-config>
+        </tunnel>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta2 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <GigabitEthernet nc:operation="delete">
+        <name>4</name>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>1</name>
+        <ip>
+          <address>
+            <primary>
+              <address>10.77.130.126</address>
+            </primary>
+          </address>
+        </ip>
+      </GigabitEthernet>
+      <Tunnel>
+        <name>2</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <source>1.1.1.1</source>
+        </tunnel>
+      </Tunnel>
+      <Tunnel nc:operation="delete">
+        <name>3</name>
+      </Tunnel>
+      <GigabitEthernet>
+        <name>3</name>
+        <shutdown/>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>true</auto>
+        </negotiation>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>2</name>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>true</auto>
+        </negotiation>
+      </GigabitEthernet>
+    </interface>
+  </native>
+</nc:config>
+            """
+        expected_delta3 = """
+<nc:config xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <native xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-native">
+    <interface>
+      <GigabitEthernet>
+        <name>1</name>
+        <ip>
+          <address>
+            <primary>
+              <address>10.77.130.127</address>
+            </primary>
+          </address>
+        </ip>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>2</name>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>false</auto>
+        </negotiation>
+      </GigabitEthernet>
+      <GigabitEthernet>
+        <name>4</name>
+        <negotiation xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-ethernet">
+          <auto>true</auto>
+        </negotiation>
+        <shutdown/>
+      </GigabitEthernet>
+      <GigabitEthernet nc:operation="delete">
+        <name>3</name>
+      </GigabitEthernet>
+      <Tunnel>
+        <name>3</name>
+        <tunnel xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-tunnel">
+          <destination-config>
+            <ipv4>2.2.2.2</ipv4>
+          </destination-config>
+        </tunnel>
+        <nat66 xmlns="http://cisco.com/ns/yang/Cisco-IOS-XE-nat">inside</nat66>
+      </Tunnel>
+      <Tunnel nc:operation="delete">
+        <name>2</name>
+      </Tunnel>
+    </interface>
+  </native>
+</nc:config>
+            """
+        config1 = Config(self.d, xml1)
+        config2 = Config(self.d, xml2)
+        delta1 = config2 - config1
+        delta2 = config1 - config2
+        delta1.random_depth = 2
+        delta1.random_seed = 2222
+        delta2.random_depth = 2
+        delta2.random_seed = 1234
+
+        self.assertEqual(delta1.random_seed, 2222)
+        self.assertEqual(str(delta1).strip(), expected_delta1.strip())
+        self.assertEqual(delta2.random_seed, 1234)
+        self.assertEqual(str(delta2).strip(), expected_delta2.strip())
+
+        delta1.random_depth = 3
+        self.assertEqual(str(delta1).strip(), expected_delta3.strip())
+
     def test_xpath_1(self):
         xml = """
             <rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
