@@ -1186,11 +1186,26 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    n.set(
-                        etree.QName(self.module_namespaces[ch.keyword[0]],
-                                    ch.keyword[1]),
-                        ch.arg if ch.arg else '',
-                    )
+                    if len(ch.substmts) > 0:
+                        sub_sm_dict = {
+                            sub.keyword[1]: sub.arg if sub.arg is not None else ''
+                            for sub in ch.substmts
+                            if (
+                                isinstance(sub.keyword, tuple) and
+                                'tailf' in sub.keyword[0]
+                            )
+                        }
+                        n.set(
+                            etree.QName(self.module_namespaces[ch.keyword[0]],
+                                        ch.keyword[1]),
+                            repr(sub_sm_dict) if sub_sm_dict else '',
+                        )
+                    else:
+                        n.set(
+                            etree.QName(self.module_namespaces[ch.keyword[0]],
+                                        ch.keyword[1]),
+                            ch.arg if ch.arg else '',
+                        )
                 else:
                     logger.warning("Special Tailf annotation at {}, "
                                    "keyword = {}"
