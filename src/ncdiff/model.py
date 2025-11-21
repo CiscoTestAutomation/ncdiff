@@ -8,7 +8,8 @@ from lxml import etree
 from copy import deepcopy
 from ncclient import operations
 from threading import Thread, current_thread
-from pyang import statements
+from pyang import statements, xpath_parser
+from pyang import xpath as xp
 try:
     from pyang.repository import FileRepository
 except ImportError:
@@ -19,6 +20,9 @@ except ImportError:
     from pyang import Context
 
 from .errors import ModelError
+from .composer import Tag
+from .tailf import get_tailf_ordering, add_tailf_annotation
+from .tailf import set_ordering_xpath
 
 
 # create a logger for this module
@@ -555,6 +559,7 @@ class CompilerContext(Context):
             self.num_threads = 2
         else:
             self.num_threads = 1
+        self._modeldevice = None
 
     def _get_latest_revision(self, modulename):
         latest = None
@@ -696,6 +701,37 @@ class CompilerContext(Context):
             'dependencies.xml',
         )
         self.dependencies = read_xml(dependencies_file)
+
+    def check_xpath_statement(self, xpath_stmt, xpath, node_stmt):
+        p = xpath_parser.parse(xpath)
+        if p is None or not isinstance(p, tuple):
+            return None
+        if p[0] == 'absolute':
+            return xp.chk_xpath_path(
+                self,
+                xpath_stmt.i_orig_module,
+                xpath_stmt.pos,
+                node_stmt,
+                'root',
+                p[1],
+            )
+        elif p[0] == 'relative':
+            return xp.chk_xpath_path(
+                self,
+                xpath_stmt.i_orig_module,
+                xpath_stmt.pos,
+                node_stmt,
+                node_stmt,
+                p[1],
+            )
+        else:
+            return None
+
+    def get_xpath_from_schema_node(self, schema_node, type=Tag.XPATH):
+        if self._modeldevice is None:
+            return None
+        else:
+            return self._modeldevice.get_xpath(schema_node, type=type, instance=False)
 
     def load_context(self):
         self.modulefile_queue = queue.Queue()
@@ -944,6 +980,10 @@ class ModelCompiler(object):
         self.module_namespaces = {}
         self.identity_deps = {}
         self.build_dependencies()
+        self.ordering_stmt_leafref = {}
+        self.ordering_stmt_tailf = {}
+        self.ordering_xpath_leafref = {}
+        self.ordering_xpath_tailf = {}
 
     @property
     def pyang_errors(self):
@@ -1114,6 +1154,9 @@ class ModelCompiler(object):
                         else:
                             self.identity_deps[b_idn].append(curr_idn)
 
+        self.ordering_stmt_leafref[module] = {}
+        self.ordering_stmt_tailf[module] = {}
+
         for child in vm.i_children:
             if child.keyword in statements.data_definition_keywords:
                 self.depict_a_schema_node(vm, st, child)
@@ -1125,6 +1168,7 @@ class ModelCompiler(object):
                 self.depict_a_schema_node(vm, st, child, mode='notification')
 
         self._write_to_cache(module, st)
+        set_ordering_xpath(self, module)
 
         return Model(st)
 
@@ -1160,7 +1204,7 @@ class ModelCompiler(object):
             if cases:
                 n.set('values', '|'.join(cases))
         elif child.keyword in ['leaf', 'leaf-list']:
-            self.set_leaf_datatype_value(child, n)
+            self.set_leaf_datatype_value(module.arg, child, n)
             sm = child.search_one('mandatory')
             if (
                 sm is not None and sm.arg == 'true' or
@@ -1178,38 +1222,26 @@ class ModelCompiler(object):
 
         # Tailf annotations
         for ch in child.substmts:
-            if (
-                isinstance(ch.keyword, tuple) and
-                'tailf' in ch.keyword[0]
-            ):
+            if isinstance(ch.keyword, tuple) and 'tailf' in ch.keyword[0]:
                 if (
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    if len(ch.substmts) > 0:
-                        sub_sm_dict = {
-                            sub.keyword[1]: sub.arg if sub.arg is not None else ''
-                            for sub in ch.substmts
-                            if (
-                                isinstance(sub.keyword, tuple) and
-                                'tailf' in sub.keyword[0]
-                            )
-                        }
-                        n.set(
-                            etree.QName(self.module_namespaces[ch.keyword[0]],
-                                        ch.keyword[1]),
-                            repr(sub_sm_dict) if sub_sm_dict else '',
-                        )
+                    ordering = get_tailf_ordering(ch)
+                    if ordering is None:
+                        add_tailf_annotation(self.module_namespaces, ch, n)
                     else:
-                        n.set(
-                            etree.QName(self.module_namespaces[ch.keyword[0]],
-                                        ch.keyword[1]),
-                            ch.arg if ch.arg else '',
-                        )
+                        target = self.context.check_xpath_statement(
+                            ch, ch.arg, child)
+                        if target is not None:
+                            self.ordering_stmt_tailf[module.arg][
+                                (child, target)] = (ordering, ch.pos)
                 else:
-                    logger.warning("Special Tailf annotation at {}, "
+                    logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
                                    .format(ch.pos, ch.keyword))
+        if not hasattr(child, 'schema_node'):
+            child.schema_node = n
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
@@ -1226,6 +1258,14 @@ class ModelCompiler(object):
                     self.depict_a_schema_node(module, n, c, mode=c.keyword)
                 else:
                     self.depict_a_schema_node(module, n, c, mode=mode)
+
+    def get_xpath_from_schema_node(self, schema_node, type=Tag.XPATH):
+        from .manager import ModelDevice
+
+        if self.context._modeldevice is None:
+            self.context._modeldevice = ModelDevice(None, None)
+            self.context._modeldevice.compiler = self
+        return self.context.get_xpath_from_schema_node(schema_node, type=type)
 
     @staticmethod
     def set_access(statement, node, mode):
@@ -1245,7 +1285,7 @@ class ModelCompiler(object):
         else:
             node.set('access', 'read-only')
 
-    def set_leaf_datatype_value(self, leaf_statement, leaf_node):
+    def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
         sm = leaf_statement.search_one('type')
         if sm is None:
             datatype = ''
@@ -1253,6 +1293,23 @@ class ModelCompiler(object):
             if sm.arg == 'leafref':
                 p = sm.search_one('path')
                 if p is not None:
+
+                    # Consider leafref as a dpendency for ordering purpose
+                    target_stmt = self.context.check_xpath_statement(
+                        p, p.arg, leaf_statement)
+                    if target_stmt is not None:
+                        self.ordering_stmt_leafref[module][
+                            (leaf_statement, target_stmt)
+                        ] = ({
+                            ('create', 'after', 'create'),
+                            ('modify', 'after', 'create'),
+                            ('create', 'after', 'modify'),
+                            ('modify', 'after', 'modify'),
+                            ('delete', 'before', 'modify'),
+                            ('modify', 'before', 'delete'),
+                            ('delete', 'before', 'delete'),
+                        }, p.pos)
+
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
                     # there is a module change in the path.
