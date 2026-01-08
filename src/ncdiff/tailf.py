@@ -1,16 +1,33 @@
-import json
 import logging
 from os import path
 from lxml import etree
+from pyang import util
 
 from .composer import Tag
 
 logger = logging.getLogger(__name__)
 
 
-def get_tailf_ordering(stmt):
-    if 'tailf' not in stmt.keyword[0]:
-        return None
+def has_tailf_ordering(stmt, context):
+    prefix, identifier = stmt.raw_keyword
+    m, rev = util.prefix_to_modulename_and_revision(
+        stmt.i_orig_module,
+        prefix,
+        stmt.pos,
+        context.errors,
+    )
+    return m == 'tailf-common' and identifier in {
+        'cli-diff-after', 'cli-diff-before',
+        'cli-diff-create-after', 'cli-diff-create-before',
+        'cli-diff-delete-after', 'cli-diff-delete-before',
+        'cli-diff-modify-after', 'cli-diff-modify-before',
+        'cli-diff-set-after', 'cli-diff-set-before',
+        'cli-diff-dependency',
+    }
+
+
+def get_tailf_ordering(context, stmt, target_stmt):
+    symmetric = is_symmetric_tailf_ordering(context, stmt, target_stmt)
     if stmt.keyword[1] in ['cli-diff-after', 'cli-diff-before']:
         conj = 'after' if stmt.keyword[1] == 'cli-diff-after' else 'before'
         valid_substmts = {
@@ -72,11 +89,17 @@ def get_tailf_ordering(stmt):
         }
         substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
         if len(substmts) == 0:
-            return {
-                ('create', conj, 'create'),
-                ('create', conj, 'modify'),
-                ('create', conj, 'delete'),
-            }
+            if symmetric:
+                return {
+                    ('create', conj, 'modify'),
+                    ('create', conj, 'delete'),
+                }
+            else:
+                return {
+                    ('create', conj, 'create'),
+                    ('create', conj, 'modify'),
+                    ('create', conj, 'delete'),
+                }
         ordering = set()
         for substmt in substmts:
             if substmt.keyword[1] == 'cli-when-target-set':
@@ -107,11 +130,17 @@ def get_tailf_ordering(stmt):
         }
         substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
         if len(substmts) == 0:
-            return {
-                ('delete', conj, 'create'),
-                ('delete', conj, 'modify'),
-                ('delete', conj, 'delete'),
-            }
+            if symmetric:
+                return {
+                    ('delete', conj, 'create'),
+                    ('delete', conj, 'modify'),
+                }
+            else:
+                return {
+                    ('delete', conj, 'create'),
+                    ('delete', conj, 'modify'),
+                    ('delete', conj, 'delete'),
+                }
         ordering = set()
         for substmt in substmts:
             if substmt.keyword[1] == 'cli-when-target-set':
@@ -340,7 +369,7 @@ def get_tailf_ordering(stmt):
                 # ('modify', 'after', 'delete'),
                 # ('delete', 'after', 'delete'),
         return ordering
-    return None
+    return set()
 
 def add_tailf_annotation(module_namespaces, stmt, node):
     if len(stmt.substmts) > 0:
@@ -399,12 +428,16 @@ def write_ordering_xpath(compiler, module, constraint_type):
             continue
         cinstraint_list, pos = constraint_info[(stmt[0], stmt[1])]
         for oper_0, sequence, oper_1 in cinstraint_list:
+            if xpath[0] == xpath[1] and oper_0 == oper_1:
+                # Skip entries with same Xpath and same operation.
+                continue
             if sequence == 'before':
                 constraints.append((
                     f"{xpath[0]}, {oper_0}", f"{xpath[1]}, {oper_1}", pos))
             else:
                 constraints.append((
                     f"{xpath[1]}, {oper_1}", f"{xpath[0]}, {oper_0}", pos))
+            update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
 
     attribute_name = "ordering_xpath_leafref" \
         if constraint_type == "ordering_stmt_leafref" \
@@ -417,3 +450,48 @@ def write_ordering_xpath(compiler, module, constraint_type):
             f.write("\n".join([f"{c[0]}, {c[1]}" for c in constraints]))
 
     return [(c[0], c[1]) for c in constraints]
+
+
+def update_schema_tree(stmt_0, oper_0, stmt_1, oper_1):
+    schema_node_1 = getattr(stmt_0, 'schema_node', None)
+    if schema_node_1 is None:
+        logger.warning(
+            f"Schema node not found for statement {stmt_0.keyword} "
+            f"at {stmt_0.pos}")
+        return
+    ordering_str = schema_node_1.get("before")
+    if ordering_str is None:
+        schema_node_1.set("before", repr({
+            oper_0: {stmt_1.schema_xpath: [oper_1]}
+        }))
+    else:
+        ordering = eval(ordering_str)
+        if oper_0 in ordering:
+            if stmt_1.schema_xpath in ordering[oper_0]:
+                if oper_1 in ordering[oper_0][stmt_1.schema_xpath]:
+                    return
+                else:
+                    ordering[oper_0][stmt_1.schema_xpath].append(oper_1)
+            else:
+                ordering[oper_0][stmt_1.schema_xpath] = [oper_1]
+        else:
+            ordering[oper_0] = {stmt_1.schema_xpath: [oper_1]}
+        schema_node_1.set("before", repr(ordering))
+
+
+def is_symmetric_tailf_ordering(context, stmt, target_stmt):
+    if len(stmt.substmts) != 0:
+        return False
+    substmts = {
+        s for s in target_stmt.substmts
+        if isinstance(s.keyword, tuple) and
+        'tailf' in s.keyword[0] and
+        len(s.substmts) == 0 and
+        s.keyword[1] == stmt.keyword[1]
+    }
+    for substmt in substmts:
+        target = context.check_data_tree_xpath(
+            substmt, target_stmt)
+        if target == stmt.parent:
+            return True
+    return False

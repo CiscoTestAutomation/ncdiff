@@ -8,7 +8,7 @@ from lxml import etree
 from copy import deepcopy
 from ncclient import operations
 from threading import Thread, current_thread
-from pyang import statements, xpath_parser
+from pyang import statements, xpath_parser, syntax, util
 from pyang import xpath as xp
 try:
     from pyang.repository import FileRepository
@@ -21,8 +21,8 @@ except ImportError:
 
 from .errors import ModelError
 from .composer import Tag
-from .tailf import get_tailf_ordering, add_tailf_annotation
-from .tailf import set_ordering_xpath
+from .tailf import has_tailf_ordering, get_tailf_ordering
+from .tailf import add_tailf_annotation, set_ordering_xpath
 
 
 # create a logger for this module
@@ -31,7 +31,11 @@ logging.getLogger('ncclient.transport').setLevel(logging.WARNING)
 logging.getLogger('ncclient.operations').setLevel(logging.WARNING)
 
 PARSER = etree.XMLParser(encoding='utf-8', remove_blank_text=True)
-
+PREFIX = syntax.prefix
+IDENTIFIER = PREFIX + r'|\*'
+KEYWORD = '((' + PREFIX + '):)?(' + IDENTIFIER + ')'
+RE_SCHEMA_NODE_ID_PART = re.compile('/' + KEYWORD)
+RE_ANNOTATE_STATEMENT = re.compile(r'^(.+)\[name=[\'|"](.+)[\'|"]\]')
 
 def write_xml(filename, element):
     element_tree = etree.ElementTree(element)
@@ -702,30 +706,134 @@ class CompilerContext(Context):
         )
         self.dependencies = read_xml(dependencies_file)
 
-    def check_xpath_statement(self, xpath_stmt, xpath, node_stmt):
-        p = xpath_parser.parse(xpath)
-        if p is None or not isinstance(p, tuple):
+    def check_data_tree_xpath(self, xpath_stmt, node_stmt):
+        if not hasattr(xpath_stmt, 'i_orig_module'):
+            logger.warning(f"Statement at {xpath_stmt.pos} does not have "
+                           "attribute 'i_orig_module'")
             return None
-        if p[0] == 'absolute':
-            return xp.chk_xpath_path(
-                self,
-                xpath_stmt.i_orig_module,
-                xpath_stmt.pos,
-                node_stmt,
-                'root',
-                p[1],
-            )
-        elif p[0] == 'relative':
-            return xp.chk_xpath_path(
+
+        p = xpath_parser.parse(xpath_stmt.arg)
+        if isinstance(p, list):
+            node = xp.chk_xpath_path(
                 self,
                 xpath_stmt.i_orig_module,
                 xpath_stmt.pos,
                 node_stmt,
                 node_stmt,
-                p[1],
+                p,
             )
+        elif isinstance(p, tuple):
+            if p[0] == 'absolute':
+                node = xp.chk_xpath_path(
+                    self,
+                    xpath_stmt.i_orig_module,
+                    xpath_stmt.pos,
+                    node_stmt,
+                    'root',
+                    p[1],
+                )
+            elif p[0] == 'relative':
+                node = xp.chk_xpath_path(
+                    self,
+                    xpath_stmt.i_orig_module,
+                    xpath_stmt.pos,
+                    node_stmt,
+                    node_stmt,
+                    p[1],
+                )
+            else:
+                logger.warning(f"Failed to understand Xpath '{xpath_stmt.arg}' "
+                               f"in data tree at {xpath_stmt.pos}")
+                return None
         else:
+            logger.warning(f"Failed to parse Xpath '{xpath_stmt.arg}' in data "
+                           f"tree at {xpath_stmt.pos}")
             return None
+        if node is None:
+            logger.warning(f"Failed to find annotated statement by the Xpath "
+                           f"'{xpath_stmt.arg}' in data tree at "
+                           f"{xpath_stmt.pos}")
+        else:
+            xpath_stmt.i_annotate_node = node
+        return node
+
+    def check_schema_tree_xpath(self, xpath_stmt):
+        if xpath_stmt.arg.startswith('/'):
+            is_absolute = True
+            arg = xpath_stmt.arg
+        else:
+            is_absolute = False
+            arg = "/" + xpath_stmt.arg
+
+        # Parse the path into a list of two-tuples of (prefix, identifier)
+        path = [(m[1], m[2]) for m in RE_SCHEMA_NODE_ID_PART.findall(arg)]
+
+        # Find the module of the first node in the path
+        if not isinstance(path, list) or len(path) == 0:
+            logger.warning(f"Failed to parse Xpath {xpath_stmt.arg} in schema "
+                           f"tree at {xpath_stmt.pos}")
+            return None
+        (prefix, identifier) = path[0]
+        module = util.prefix_to_module(
+            xpath_stmt.i_module, prefix, xpath_stmt.pos, self.errors)
+        if module is None:
+            logger.warning(f"Failed to find a module by the prefix {prefix} "
+                           f"at {xpath_stmt.pos}")
+            return None
+        if is_absolute:
+            node = statements.search_data_keyword_child(module.i_children,
+                                                        module.i_modulename,
+                                                        identifier)
+            if node is None:
+                # Check all our submodules
+                for inc in module.search('include'):
+                    submod = self.get_module(inc.arg)
+                    if submod is not None:
+                        node = statements.search_data_keyword_child(
+                            submod.i_children,
+                            submod.i_modulename,
+                            identifier)
+                        if node is not None:
+                            break
+                if node is None:
+                    logger.warning("Failed to find annotated statement by the "
+                                   f"identifier {prefix}:{identifier} at "
+                                   f"{xpath_stmt.pos}")
+                    return None
+            path = path[1:]
+        else:
+            if hasattr(xpath_stmt.parent, 'i_annotate_node'):
+                node = xpath_stmt.parent.i_annotate_node
+            else:
+                logger.warning("Parent statement does not have a resolved "
+                               f"target: {xpath_stmt.pos}")
+                return None
+
+        # Recurse down the path
+        for prefix, identifier in path:
+            if hasattr(node, 'i_children'):
+                children = node.i_children
+            else:
+                children = []
+            if prefix == '' and identifier == '*':
+                return children
+            module = util.prefix_to_module(
+                xpath_stmt.i_module, prefix, xpath_stmt.pos, self.errors)
+            if module is None:
+                logger.warning("Failed to find a module by the prefix "
+                               f"{prefix}: {xpath_stmt.pos}")
+                return None
+            child = statements.search_data_keyword_child(children,
+                                                         module.i_modulename,
+                                                         identifier)
+            if child is None:
+                logger.warning("Failed to find annotated statement by the "
+                               f"identifier {prefix}:{identifier} at "
+                               f"{xpath_stmt.pos}")
+                return None
+            node = child
+        xpath_stmt.i_annotate_node = node
+        return node
 
     def get_xpath_from_schema_node(self, schema_node, type=Tag.XPATH):
         if self._modeldevice is None:
@@ -747,6 +855,153 @@ class CompilerContext(Context):
         self.modulefile_queue.join()
         self.write_dependencies()
 
+    def process_annotation_module(self, preprocessing=True):
+
+        def tailf_annotate(context, annotating_stmt):
+            target = context.check_schema_tree_xpath(annotating_stmt)
+            if target is not None:
+                for annitating_substmt in annotating_stmt.substmts:
+                    if annitating_substmt.keyword == (
+                        'tailf-common',
+                        'annotate',
+                    ):
+                        tailf_annotate(context, annitating_substmt)
+                    else:
+                        if isinstance(target, list):
+                            for t in target:
+                                append_annotation(t, annitating_substmt)
+                        else:
+                            append_annotation(target, annitating_substmt)
+
+        def tailf_annotate_module(context, module_stmt):
+            for substmt in module_stmt.substmts:
+                if substmt.keyword == ('tailf', 'annotate-module'):
+                    annotated_module = context.get_module(substmt.arg)
+                    if annotated_module is None:
+                        logger.warning("Failed to find annotated module "
+                                       f"{substmt.arg} at {substmt.pos}")
+                        continue
+                    substmt.i_annotate_node = annotated_module
+                    for annotating_substmt in substmt.substmts:
+                        if isinstance(substmt.raw_keyword, tuple):
+                            prefix, identifier = annotating_substmt.raw_keyword
+                            m, rev = util.prefix_to_modulename_and_revision(
+                                annotating_substmt.i_module,
+                                prefix,
+                                annotating_substmt.pos,
+                                context.errors,
+                            )
+                            if (
+                                m == 'tailf-common' and
+                                identifier == 'annotate-statement'
+                            ):
+                                tailf_annotate_statement(
+                                    context, annotating_substmt)
+                            else:
+                                append_annotation(
+                                    annotated_module, annotating_substmt)
+                        else:
+                            append_annotation(
+                                annotated_module, annotating_substmt)
+
+        def tailf_annotate_statement(context, annotating_stmt):
+            annotated_stmt = annotating_stmt.parent.i_annotate_node
+            match = re.match(RE_ANNOTATE_STATEMENT, annotating_stmt.arg)
+            if match:
+                matched_stmts = [
+                    s for s in annotated_stmt.substmts
+                    if s.keyword == match.group(1) and s.arg == match.group(2)
+                ]
+                if len(matched_stmts) == 0:
+                    logger.warning("Annotating statement at "
+                                   f"{annotating_stmt.pos}: Failed to find a "
+                                   f"matching sub-statement '{match.group(1)} "
+                                   f"{match.group(2)}' under the annotated "
+                                   f"statement at {annotated_stmt.pos}")
+                    return
+                elif len(matched_stmts) > 1:
+                    logger.warning("Annotating statement at "
+                                   f"{annotating_stmt.pos}: Found more than "
+                                   "one matching sub-statement "
+                                   f"'{match.group(1)} {match.group(2)}' "
+                                   "under the annotated statement at "
+                                   f"{annotated_stmt.pos}")
+                    return
+            elif annotating_stmt.arg == 'type':
+                matched_stmts = [
+                    s for s in annotated_stmt.substmts
+                    if s.keyword == 'type'
+                ]
+                if len(matched_stmts) == 0:
+                    logger.warning("Annotating statement at "
+                                   f"{annotating_stmt.pos}: 'type' not found "
+                                   "under the annotated statement at "
+                                   f"{annotated_stmt.pos}")
+                    return
+                elif len(matched_stmts) > 1:
+                    logger.warning("Annotating statement at "
+                                   f"{annotating_stmt.pos}: found more than "
+                                   "one 'type' under the annotated statement "
+                                   f"at {annotated_stmt.pos}")
+                    return
+            else:
+                logger.warning("Annotating statement at "
+                               f"{annotating_stmt.pos}: Invalid arg "
+                               f"{annotating_stmt.arg}")
+                return
+
+            annotating_stmt.i_annotate_node = matched_stmts[0]
+            for substmt in annotating_stmt.substmts:
+                if isinstance(substmt.raw_keyword, tuple):
+                    annotate_statement = False
+                    prefix, identifier = substmt.raw_keyword
+                    m, rev = util.prefix_to_modulename_and_revision(
+                        substmt.i_module,
+                        prefix,
+                        substmt.pos,
+                        context.errors,
+                    )
+                    if (
+                        m == 'tailf-common' and
+                        identifier == 'annotate-statement'
+                    ):
+                        tailf_annotate_statement(context, substmt)
+                    else:
+                        append_annotation(matched_stmts[0], substmt)
+                else:
+                    append_annotation(matched_stmts[0], substmt)
+
+        def append_annotation(target_stmt, annotation_stmt):
+            new_stmt = statements.new_statement(
+                annotation_stmt.top,
+                target_stmt,
+                annotation_stmt.pos,
+                annotation_stmt.keyword,
+                annotation_stmt.arg,
+            )
+            new_stmt.raw_keyword = annotation_stmt.raw_keyword
+            new_stmt.i_orig_module = annotation_stmt.top
+            if hasattr(target_stmt, 'i_module'):
+                new_stmt.i_module = target_stmt.i_module
+            target_stmt.substmts.append(new_stmt)
+            for substmt in annotation_stmt.substmts:
+                append_annotation(new_stmt, substmt)
+
+        mudule_names = [k[0] for k in self.modules]
+        for mudule_name in mudule_names:
+            if mudule_name.endswith('-ann'):
+                module_statement = self.get_module(mudule_name)
+                if module_statement is None:
+                    logger.warning(f"Failed to find annotation module {mudule_name}")
+                elif preprocessing:
+                    tailf_annotate_module(self, module_statement)
+                    logger.debug(f"Pre-processed tailf:annotate-module in {mudule_name}")
+                else:
+                    for substmt in module_statement.substmts:
+                        if substmt.keyword == ('tailf-common', 'annotate'):
+                            tailf_annotate(self, substmt)
+                    logger.debug(f"Post-processed tailf:annotate in {mudule_name}")
+
     def validate_context(self):
         revisions = {}
         for mudule_name, module_revision in self.modules:
@@ -756,17 +1011,36 @@ class CompilerContext(Context):
             ):
                 revisions[mudule_name] = module_revision
         self.sort_modules()
+
+        # Initialize annotation modules
+        annotation_modules = [m for k, m in self.modules.items()
+                              if k[0].endswith("-ann")]
+        for m in annotation_modules:
+            statements.v_init_module(self, m)
+
+        # Process annotation modules as a pre-processing step
+        self.process_annotation_module(preprocessing=True)
+
         self.validate()
         if 'prune' in dir(statements.Statement):
             for mudule_name, module_revision in revisions.items():
                 self.modules[(mudule_name, module_revision)].prune()
 
+        # Process annotation modules as a post-processing step
+        self.process_annotation_module(preprocessing=False)
+
     def sort_modules(self):
-        submodules = {k: m for k, m in self.modules.items()
-                      if m.keyword == "submodule"}
-        for k in submodules:
-            del self.modules[k]
-        self.modules.update(submodules)
+        modulename_revision = {k[0]: k for k in self.modules.keys()}
+        submodules = sorted([
+            k[0] for k, m in self.modules.items() if m.keyword == "submodule"
+        ])
+        modules = sorted([
+            k for k in modulename_revision if k not in submodules
+        ])
+        self.modules = {
+            modulename_revision[k]: self.modules[modulename_revision[k]]
+            for k in modules + submodules
+        }
 
     def internal_reset(self):
         self.modules = {}
@@ -984,6 +1258,8 @@ class ModelCompiler(object):
         self.ordering_stmt_tailf = {}
         self.ordering_xpath_leafref = {}
         self.ordering_xpath_tailf = {}
+        self._ordering_without_obsolete = True
+        self._ordering_without_deprecated = False
 
     @property
     def pyang_errors(self):
@@ -1036,27 +1312,39 @@ class ModelCompiler(object):
         -------
 
         tuple
-            A tuple with two elements: a set of imports and a set of depends.
+            A tuple with three elements: a set of imports, a set of includes
+            and a set of other depends.
         '''
+
+        def find_all_depends(depends, dependencies):
+            depends_copy = set(depends)
+            for m in dependencies:
+                if (
+                    list(filter(lambda i: i.get('module') in depends,
+                                m.findall('./imports/import'))) or
+                    list(filter(lambda i: i.get('module') in depends,
+                                m.findall('./includes/include')))
+                ):
+                    depends.add(m.get('id'))
+            return depends_copy != depends
 
         if self.context is None or self.context.dependencies is None:
             self.build_dependencies()
         dependencies = self.context.dependencies
 
         imports = set()
+        includes = set()
         for m in list(filter(lambda i: i.get('id') == module,
                              dependencies.findall('./module'))):
             imports.update(set(i.get('module')
                                for i in m.findall('./imports/import')))
-        depends = set()
-        for m in dependencies:
-            if list(filter(lambda i: i.get('module') == module,
-                           m.findall('./imports/import'))):
-                depends.add(m.get('id'))
-            if list(filter(lambda i: i.get('module') == module,
-                           m.findall('./includes/include'))):
-                depends.add(m.get('id'))
-        return (imports, depends)
+            includes.update(set(i.get('module')
+                               for i in m.findall('./includes/include')))
+
+        depends = imports | includes
+        while find_all_depends(depends, dependencies):
+            pass
+        return (imports, includes, depends - imports - includes)
 
     def compile(self, module):
         '''compile
@@ -1081,8 +1369,8 @@ class ModelCompiler(object):
             return Model(cached_tree)
 
         varnames = Context.add_module.__code__.co_varnames
-        imports, depends = self.get_dependencies(module)
-        required_module_set = imports | depends
+        imports, includes, depends = self.get_dependencies(module)
+        required_module_set = imports | includes | depends
         required_module_set.add(module)
         self.context.internal_reset()
         for m in required_module_set:
@@ -1227,15 +1515,30 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    ordering = get_tailf_ordering(ch)
-                    if ordering is None:
-                        add_tailf_annotation(self.module_namespaces, ch, n)
-                    else:
-                        target = self.context.check_xpath_statement(
-                            ch, ch.arg, child)
-                        if target is not None:
-                            self.ordering_stmt_tailf[module.arg][
-                                (child, target)] = (ordering, ch.pos)
+                    status = self.obsolete_or_deprecated(child)
+                    if not (
+                        status == 'obsolete' and
+                        self._ordering_without_obsolete or
+                        status == 'deprecated' and
+                        self._ordering_without_deprecated
+                    ):
+                        if not has_tailf_ordering(ch, self.context):
+                            add_tailf_annotation(self.module_namespaces, ch, n)
+                        else:
+                            target = self.context.check_data_tree_xpath(
+                                ch, child)
+                            if target is not None:
+                                status = self.obsolete_or_deprecated(target)
+                                if not (
+                                    status == 'obsolete' and
+                                    self._ordering_without_obsolete or
+                                    status == 'deprecated' and
+                                    self._ordering_without_deprecated
+                                ):
+                                    ordering = get_tailf_ordering(
+                                        self.context, ch, target)
+                                    self.ordering_stmt_tailf[module.arg][
+                                        (child, target)] = (ordering, ch.pos)
                 else:
                     logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
@@ -1295,20 +1598,33 @@ class ModelCompiler(object):
                 if p is not None:
 
                     # Consider leafref as a dpendency for ordering purpose
-                    target_stmt = self.context.check_xpath_statement(
-                        p, p.arg, leaf_statement)
-                    if target_stmt is not None:
-                        self.ordering_stmt_leafref[module][
-                            (leaf_statement, target_stmt)
-                        ] = ({
-                            ('create', 'after', 'create'),
-                            ('modify', 'after', 'create'),
-                            ('create', 'after', 'modify'),
-                            ('modify', 'after', 'modify'),
-                            ('delete', 'before', 'modify'),
-                            ('modify', 'before', 'delete'),
-                            ('delete', 'before', 'delete'),
-                        }, p.pos)
+                    status = self.obsolete_or_deprecated(leaf_statement)
+                    if not (
+                        status == 'obsolete' and
+                        self._ordering_without_obsolete or
+                        status == 'deprecated' and
+                        self._ordering_without_deprecated
+                    ):
+                        target_stmt = self.context.check_data_tree_xpath(
+                            p, leaf_statement)
+                        if target_stmt is not None:
+                            status = self.obsolete_or_deprecated(target_stmt)
+                            if not (
+                                status == 'obsolete' and
+                                self._ordering_without_obsolete or
+                                status == 'deprecated' and
+                                self._ordering_without_deprecated
+                            ):
+                                self.ordering_stmt_leafref[module][
+                                    (leaf_statement, target_stmt)
+                                ] = ({
+                                    ('create', 'after', 'create'),
+                                    ('modify', 'after', 'create'),
+                                    ('create', 'after', 'modify'),
+                                    ('delete', 'before', 'modify'),
+                                    ('modify', 'before', 'delete'),
+                                    ('delete', 'before', 'delete'),
+                                }, p.pos)
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
@@ -1395,6 +1711,15 @@ class ModelCompiler(object):
             if values:
                 return '|'.join(value_stmts)
         return ''
+
+    @staticmethod
+    def obsolete_or_deprecated(statement):
+        while statement is not None:
+            sm = statement.search_one('status')
+            if sm is not None and sm.arg in ['obsolete', 'deprecated']:
+                return sm.arg
+            statement = statement.parent
+        return None
 
 
 class ModelDiff(object):
