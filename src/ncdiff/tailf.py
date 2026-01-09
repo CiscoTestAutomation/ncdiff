@@ -434,10 +434,11 @@ def write_ordering_xpath(compiler, module, constraint_type):
             if sequence == 'before':
                 constraints.append((
                     f"{xpath[0]}, {oper_0}", f"{xpath[1]}, {oper_1}", pos))
+                update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
             else:
                 constraints.append((
                     f"{xpath[1]}, {oper_1}", f"{xpath[0]}, {oper_0}", pos))
-            update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
+                update_schema_tree(stmt[1], oper_1, stmt[0], oper_0)
 
     attribute_name = "ordering_xpath_leafref" \
         if constraint_type == "ordering_stmt_leafref" \
