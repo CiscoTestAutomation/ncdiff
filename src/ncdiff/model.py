@@ -1537,8 +1537,11 @@ class ModelCompiler(object):
                                 ):
                                     ordering = get_tailf_ordering(
                                         self.context, ch, target)
-                                    self.ordering_stmt_tailf[module.arg][
-                                        (child, target)] = (ordering, ch.pos)
+                                    self.ordering_stmt_tailf[module.arg][ch] = (
+                                        child,
+                                        target,
+                                        ordering,
+                                    )
                 else:
                     logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
@@ -1616,15 +1619,18 @@ class ModelCompiler(object):
                                 self._ordering_without_deprecated
                             ):
                                 self.ordering_stmt_leafref[module][
-                                    (leaf_statement, target_stmt)
-                                ] = ({
-                                    ('create', 'after', 'create'),
-                                    ('modify', 'after', 'create'),
-                                    ('create', 'after', 'modify'),
-                                    ('delete', 'before', 'modify'),
-                                    ('modify', 'before', 'delete'),
-                                    ('delete', 'before', 'delete'),
-                                }, p.pos)
+                                    leaf_statement] = (
+                                    leaf_statement,
+                                    target_stmt,
+                                    [
+                                        ('create', 'after', 'create'),
+                                        ('modify', 'after', 'create'),
+                                        ('create', 'after', 'modify'),
+                                        ('delete', 'before', 'modify'),
+                                        ('modify', 'before', 'delete'),
+                                        ('delete', 'before', 'delete'),
+                                    ],
+                                )
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
