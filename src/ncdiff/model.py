@@ -1258,8 +1258,12 @@ class ModelCompiler(object):
         self.ordering_stmt_tailf = {}
         self.ordering_xpath_leafref = {}
         self.ordering_xpath_tailf = {}
-        self._ordering_without_obsolete = True
-        self._ordering_without_deprecated = False
+        self._dependencies = {}
+
+        self.exclude_obsolete = False
+        self.exclude_deprecated = False
+        self.include_xpaths = set()
+        self.exclude_xpaths = set()
 
     @property
     def pyang_errors(self):
@@ -1344,7 +1348,9 @@ class ModelCompiler(object):
         depends = imports | includes
         while find_all_depends(depends, dependencies):
             pass
-        return (imports, includes, depends - imports - includes)
+        self._dependencies[module] = (
+            imports, includes, depends - imports - includes)
+        return self._dependencies[module]
 
     def compile(self, module):
         '''compile
@@ -1470,6 +1476,13 @@ class ModelCompiler(object):
         sm = child.search_one('status')
         if sm is not None and sm.arg in ['deprecated', 'obsolete']:
             n.set('status', sm.arg)
+
+        if self.skip(child, n):
+            parent.remove(n)
+            return
+        if not hasattr(child, 'schema_node'):
+            child.schema_node = n
+
         sm = child.search('default')
         if sm is not None and len(sm) > 0:
             n.set('default', ",".join(map(lambda x: x.arg, sm)))
@@ -1515,39 +1528,23 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    status = self.obsolete_or_deprecated(child)
-                    if not (
-                        status == 'obsolete' and
-                        self._ordering_without_obsolete or
-                        status == 'deprecated' and
-                        self._ordering_without_deprecated
-                    ):
-                        if not has_tailf_ordering(ch, self.context):
-                            add_tailf_annotation(self.module_namespaces, ch, n)
-                        else:
-                            target = self.context.check_data_tree_xpath(
-                                ch, child)
-                            if target is not None:
-                                status = self.obsolete_or_deprecated(target)
-                                if not (
-                                    status == 'obsolete' and
-                                    self._ordering_without_obsolete or
-                                    status == 'deprecated' and
-                                    self._ordering_without_deprecated
-                                ):
-                                    ordering = get_tailf_ordering(
-                                        self.context, ch, target)
-                                    self.ordering_stmt_tailf[module.arg][ch] = (
-                                        child,
-                                        target,
-                                        ordering,
-                                    )
+                    if not has_tailf_ordering(ch, self.context):
+                        add_tailf_annotation(self.module_namespaces, ch, n)
+                    else:
+                        target = self.context.check_data_tree_xpath(
+                            ch, child)
+                        if target is not None:
+                            ordering = get_tailf_ordering(
+                                self.context, ch, target)
+                            self.ordering_stmt_tailf[module.arg][ch] = (
+                                child,
+                                target,
+                                ordering,
+                            )
                 else:
                     logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
                                    .format(ch.pos, ch.keyword))
-        if not hasattr(child, 'schema_node'):
-            child.schema_node = n
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
@@ -1601,36 +1598,23 @@ class ModelCompiler(object):
                 if p is not None:
 
                     # Consider leafref as a dpendency for ordering purpose
-                    status = self.obsolete_or_deprecated(leaf_statement)
-                    if not (
-                        status == 'obsolete' and
-                        self._ordering_without_obsolete or
-                        status == 'deprecated' and
-                        self._ordering_without_deprecated
-                    ):
+                    if not self.skip(leaf_statement, leaf_node):
                         target_stmt = self.context.check_data_tree_xpath(
                             p, leaf_statement)
                         if target_stmt is not None:
-                            status = self.obsolete_or_deprecated(target_stmt)
-                            if not (
-                                status == 'obsolete' and
-                                self._ordering_without_obsolete or
-                                status == 'deprecated' and
-                                self._ordering_without_deprecated
-                            ):
-                                self.ordering_stmt_leafref[module][
-                                    leaf_statement] = (
-                                    leaf_statement,
-                                    target_stmt,
-                                    [
-                                        ('create', 'after', 'create'),
-                                        ('modify', 'after', 'create'),
-                                        ('create', 'after', 'modify'),
-                                        ('delete', 'before', 'modify'),
-                                        ('modify', 'before', 'delete'),
-                                        ('delete', 'before', 'delete'),
-                                    ],
-                                )
+                            self.ordering_stmt_leafref[module][
+                                leaf_statement] = (
+                                leaf_statement,
+                                target_stmt,
+                                [
+                                    ('create', 'after', 'create'),
+                                    ('modify', 'after', 'create'),
+                                    ('create', 'after', 'modify'),
+                                    ('delete', 'before', 'modify'),
+                                    ('modify', 'before', 'delete'),
+                                    ('delete', 'before', 'delete'),
+                                ],
+                            )
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
@@ -1647,12 +1631,12 @@ class ModelCompiler(object):
                         else:
                             target.append(prefix + ':' + name)
                             curprefix = prefix
-                    datatype = "-> %s" % "/".join(target)
+                    datatype = f'leafref {"/".join(target)}'
                 else:
                     datatype = sm.arg
             elif sm.arg == 'identityref':
                 idn_base = sm.search_one('base')
-                datatype = sm.arg + ":" + idn_base.arg
+                datatype = f'identityref {idn_base.arg}'
             else:
                 datatype = sm.arg
             leaf_node.set('datatype', datatype)
@@ -1718,14 +1702,30 @@ class ModelCompiler(object):
                 return '|'.join(value_stmts)
         return ''
 
-    @staticmethod
-    def obsolete_or_deprecated(statement):
-        while statement is not None:
-            sm = statement.search_one('status')
-            if sm is not None and sm.arg in ['obsolete', 'deprecated']:
-                return sm.arg
-            statement = statement.parent
-        return None
+    def skip(self, statement, schema_node):
+        xpath = self.get_xpath_from_schema_node(
+            schema_node, type=Tag.LXML_XPATH)
+        for in_xpath in self.include_xpaths:
+            if in_xpath == xpath or in_xpath.startswith(xpath + '/'):
+                return False
+        for ex_xpath in self.exclude_xpaths:
+            if ex_xpath == xpath or xpath.startswith(ex_xpath + '/'):
+                return True
+
+        # i_not_implemented should be set to True when features in the context
+        # are not met
+        if getattr(statement, "i_not_implemented", None) is True:
+            return True
+
+        status = schema_node.get('status', default=None)
+        if (
+            status == 'obsolete' and
+            self.exclude_obsolete or
+            status == 'deprecated' and
+            self.exclude_deprecated
+        ):
+            return True
+        return False
 
 
 class ModelDiff(object):

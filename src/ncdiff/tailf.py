@@ -428,9 +428,6 @@ def write_ordering_xpath(compiler, module, constraint_type):
             # Skip entries with missing Xpath. Missing Xpaths might be in a
             # different module not compiled or due to other deviations.
             if xpath[i] == '':
-                logger.warning("Xpath is not available for the statement at "
-                               f"{stmt[i].pos}. Skipping this TailF ordering "
-                               "constraint.")
                 break
         else:
             for oper_0, sequence, oper_1 in cinstraint_list:
