@@ -72,8 +72,8 @@ develop:
 	@echo "--------------------------------------------------------------------"
 	@echo "Building and installing $(PKG_NAME) development distributable: $@"
 	@echo ""
-
-	@./setup.py develop --no-deps -q
+	@pip3 uninstall -y ncdiff
+	@python3 setup.py develop --no-deps -q
 
 	@echo "Completed building and installing: $@"
 	@echo ""
