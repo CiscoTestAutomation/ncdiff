@@ -2071,3 +2071,33 @@ ip dhcp relay information option
         for expected_line in expected_lines:
             self.assertIn(expected_line, clis,
                           f'CLI "{expected_line}" is missing')
+
+    def test_classmap_match_protocol(self):
+        config_1 = """
+class-map match-any FC_AF41
+  match protocol skype
+  match protocol webex-media
+class-map match-any FC_EF
+  match protocol attribute traffic-class real-time-interactive
+  match protocol attribute traffic-class signaling
+  match protocol attribute traffic-class voip-telephony
+        """
+        config_2 = """
+class-map match-any FC_AF41
+  match protocol webex-media
+  match protocol skype
+class-map match-any FC_EF
+  match protocol attribute traffic-class voip-telephony
+  match protocol attribute traffic-class real-time-interactive
+  match protocol attribute traffic-class signaling
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
