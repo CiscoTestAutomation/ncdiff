@@ -8,22 +8,25 @@ from .composer import Tag
 logger = logging.getLogger(__name__)
 
 
-def has_tailf_ordering(stmt, context):
-    prefix, identifier = stmt.raw_keyword
-    m, rev = util.prefix_to_modulename_and_revision(
-        stmt.i_orig_module,
-        prefix,
-        stmt.pos,
-        context.errors,
-    )
-    return m == 'tailf-common' and identifier in {
-        'cli-diff-after', 'cli-diff-before',
-        'cli-diff-create-after', 'cli-diff-create-before',
-        'cli-diff-delete-after', 'cli-diff-delete-before',
-        'cli-diff-modify-after', 'cli-diff-modify-before',
-        'cli-diff-set-after', 'cli-diff-set-before',
-        'cli-diff-dependency',
-    }
+def is_tailf_ordering(stmt, context):
+    if isinstance(stmt.raw_keyword, tuple):
+        prefix, identifier = stmt.raw_keyword
+        m, rev = util.prefix_to_modulename_and_revision(
+            stmt.i_orig_module,
+            prefix,
+            stmt.pos,
+            context.errors,
+        )
+        return m == 'tailf-common' and identifier in {
+            'cli-diff-after', 'cli-diff-before',
+            'cli-diff-create-after', 'cli-diff-create-before',
+            'cli-diff-delete-after', 'cli-diff-delete-before',
+            'cli-diff-modify-after', 'cli-diff-modify-before',
+            'cli-diff-set-after', 'cli-diff-set-before',
+            'cli-diff-dependency',
+        }
+    else:
+        return False
 
 
 def get_tailf_ordering(context, stmt, target_stmt):
@@ -400,11 +403,11 @@ def set_ordering_xpath(compiler, module):
             hasattr(compiler, constraint_type) and
             module in getattr(compiler, constraint_type)
         ):
-            write_ordering_xpath(
+            update_ordering_xpath(
                 compiler, module, constraint_type)
 
 
-def write_ordering_xpath(compiler, module, constraint_type):
+def update_ordering_xpath(compiler, module, constraint_type):
 
     def get_xpath(compiler, stmt):
         schema_node = getattr(stmt, 'schema_node', None)

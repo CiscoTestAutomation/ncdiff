@@ -21,7 +21,7 @@ except ImportError:
 
 from .errors import ModelError
 from .composer import Tag
-from .tailf import has_tailf_ordering, get_tailf_ordering
+from .tailf import is_tailf_ordering, get_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
 
 
@@ -1528,7 +1528,7 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    if not has_tailf_ordering(ch, self.context):
+                    if not is_tailf_ordering(ch, self.context):
                         add_tailf_annotation(self.module_namespaces, ch, n)
                     else:
                         target = self.context.check_data_tree_xpath(
