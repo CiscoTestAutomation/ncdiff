@@ -13,7 +13,7 @@ import shlex
 import unittest
 import subprocess
 from setuptools import setup, find_packages, Command
-from setuptools.command.test import test
+
 
 pkg_name = 'ncdiff'
 pkg_path = '/'.join(pkg_name.split('.'))
