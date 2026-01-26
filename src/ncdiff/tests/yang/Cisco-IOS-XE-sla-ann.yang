@@ -1,0 +1,83 @@
+module Cisco-IOS-XE-sla-ann {
+  namespace "http://cisco.com/ns/yang/Cisco-IOS-XE-sla-ann";
+  prefix ios-sla-ann;
+
+  import Cisco-IOS-XE-native {
+    prefix ios;
+  }
+
+  import Cisco-IOS-XE-sla {
+    prefix ios-sla;
+  }
+
+  import Cisco-IOS-XE-ethernet {
+    prefix ios-eth;
+  }
+  import tailf-common {
+    prefix tailf;
+  }
+
+  organization
+    "Cisco Systems, Inc.";
+
+  contact
+    "Cisco Systems, Inc.
+     Customer Service
+     Postal: 170 W Tasman Drive
+     San Jose, CA 95134
+     Tel: +1 1800 553-NETS
+     E-mail: cs-yang@cisco.com";
+
+  description
+    "Cisco XE Native Service Level Agreements (SLA) Annotation Yang Model.
+     Copyright (c) 2019-2021 by Cisco Systems, Inc.
+     All rights reserved.";
+
+  revision 2020-07-01 {
+    description
+      "Removed annotations for ethernet-monitor container nodes as they are hardened in
+       17.1.1 release";
+  }
+
+  revision 2019-12-04 {
+    description
+      "Added annotations for all non-hardened nodes to hide them from
+       controller";
+  }
+
+  revision 2019-03-28 {
+    description "Initial revision";
+  }
+
+  tailf:annotate-module Cisco-IOS-XE-sla {
+    tailf:annotate-statement "grouping[name='config-ip-sla-grouping']" {
+      tailf:annotate-statement "container[name='sla']" {
+        tailf:annotate-statement "list[name='entry']" {
+          tailf:annotate-statement "choice[name='sla-param'] " {
+            tailf:annotate-statement "case[name='path-echo-case'] " {
+              tailf:annotate-statement "container[name='path-echo']" {
+                tailf:annotate-statement "leaf[name='source-ip']" {
+                  tailf:cli-diff-create-after "/ios:native/ios:interface/ios:GigabitEthernet/ios-eth:carrier-delay/ios-eth:seconds" {
+                    tailf:cli-when-target-set;
+                  }
+                  tailf:cli-diff-delete-before "/ios:native/ios:interface/ios:GigabitEthernet/ios-eth:carrier-delay/ios-eth:seconds" {
+                    tailf:cli-when-target-delete;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  tailf:annotate "/ios:native/ios:ip/ios-sla:sla/ios-sla:entry/ios-sla:sla-param/ios-sla:path-echo-case/ios-sla:path-echo/ios-sla:dst-ip" {
+    tailf:cli-diff-create-after "/ios:native/ios:interface/ios:GigabitEthernet/ios-eth:carrier-delay/ios-eth:seconds" {
+      tailf:cli-when-target-delete;
+    }
+    tailf:cli-diff-delete-before "/ios:native/ios:interface/ios:GigabitEthernet/ios-eth:carrier-delay/ios-eth:seconds" {
+      tailf:cli-when-target-create;
+    }
+  }
+}
