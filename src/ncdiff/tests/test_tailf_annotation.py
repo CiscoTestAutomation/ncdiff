@@ -299,12 +299,14 @@ class TestNative(unittest.TestCase):
             self.assertEqual(len(stmts), 1)
             stmt = stmts[0]
         leafref = stmt
-        self.assertIn(
-            leafref,
-            self.compiler.ordering_stmt_leafref['Cisco-IOS-XE-native'],
-        )
-        leafref_stmt, target_stmt, ordering = \
-            self.compiler.ordering_stmt_leafref['Cisco-IOS-XE-native'][leafref]
+
+        tuples = [
+            i
+            for i in self.compiler.ordering_stmt_leafref['Cisco-IOS-XE-native']
+            if i[0] is leafref
+        ]
+        self.assertEqual(len(tuples), 1)
+        leafref_stmt, target_stmt, ordering, position = tuples[0]
 
         type_stmt = leafref.search_one('type')
         self.assertIsNotNone(type_stmt)
@@ -315,6 +317,8 @@ class TestNative(unittest.TestCase):
 
         self.assertIs(leafref, leafref_stmt)
         self.assertIs(target, target_stmt)
+        self.assertIsInstance(ordering, list)
+        self.assertIn('Cisco-IOS-XE-parser.yang:160', str(position))
 
     def test_ordering_stmt_tailf(self):
         self.assertIn('Cisco-IOS-XE-native', self.compiler.ordering_stmt_tailf)
@@ -359,18 +363,6 @@ class TestNative(unittest.TestCase):
             annotation_substmt.keyword,
             ("tailf-common", "cli-when-target-delete"),
         )
-        self.assertIn(
-            annotation,
-            self.compiler.ordering_stmt_tailf['Cisco-IOS-XE-native'],
-        )
-        node_stmt, target_stmt, ordering = \
-            self.compiler.ordering_stmt_tailf['Cisco-IOS-XE-native'][annotation]
-
-        target = self.compiler.context.check_data_tree_xpath(
-            annotation, node)
-
-        self.assertIs(node_stmt, node)
-        self.assertIs(target, target_stmt)
 
         # tailf:cli-diff-delete-before
         stmts = [i for i in node.substmts
@@ -385,18 +377,28 @@ class TestNative(unittest.TestCase):
             annotation_substmt.keyword,
             ("tailf-common", "cli-when-target-create"),
         )
-        self.assertIn(
-            annotation,
-            self.compiler.ordering_stmt_tailf['Cisco-IOS-XE-native'],
-        )
-        node_stmt, target_stmt, ordering = \
-            self.compiler.ordering_stmt_tailf['Cisco-IOS-XE-native'][annotation]
+
+        tuples = [
+            i
+            for i in self.compiler.ordering_stmt_tailf['Cisco-IOS-XE-native']
+            if i[0] is node
+        ]
+        self.assertEqual(len(tuples), 2)
 
         target = self.compiler.context.check_data_tree_xpath(
             annotation, node)
-
-        self.assertIs(node_stmt, node)
-        self.assertIs(target, target_stmt)
+        positions = [
+            'Cisco-IOS-XE-sla-ann.yang:76',
+            'Cisco-IOS-XE-sla-ann.yang:79',
+        ]
+        for node_stmt, target_stmt, ordering, position in tuples:
+            self.assertIs(target, target_stmt)
+            self.assertIsInstance(ordering, list)
+            for p in positions:
+                if p in str(position):
+                    positions.remove(p)
+                    break
+        self.assertEqual(len(positions), 0)
 
     def test_datatype_leafref(self):
         # Line 159 in Cisco-IOS-XE-parser.yang:

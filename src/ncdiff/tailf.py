@@ -398,16 +398,40 @@ def add_tailf_annotation(module_namespaces, stmt, node):
 
 
 def set_ordering_xpath(compiler, module):
-    for constraint_type in ["ordering_stmt_leafref", "ordering_stmt_tailf"]:
+    # There are cases where a leafref node has TailF ordering annotations
+    # defined. For example:
+    # leaf nve {
+    #   description
+    #     "Network virtualization endpoint interface";
+    #   tailf:cli-allow-join-with-value {
+    #     tailf:cli-display-joined;
+    #   }
+    #   tailf:cli-diff-create-after "/ios:native/ios:interface/ios:nve/ios:name" {
+    #     tailf:cli-when-target-set;
+    #   }
+    #   tailf:cli-diff-delete-before "/ios:native/ios:interface/ios:nve/ios:name" {
+    #     tailf:cli-when-target-delete;
+    #   }
+    #   type leafref {
+    #     path "/ios:native/ios:interface/ios:nve/ios:name";
+    #   }
+    # }
+    # In this case, we treat TailF ordering annotations as higher priority and
+    # ignore the default leafref ordering constraints. To support this, we
+    # define a dictionary to track existing nodes that have TailF ordering
+    # annotations applied.
+    tailf_ordering = {}
+
+    for constraint_type in ["ordering_stmt_tailf", "ordering_stmt_leafref"]:
         if (
             hasattr(compiler, constraint_type) and
             module in getattr(compiler, constraint_type)
         ):
             update_ordering_xpath(
-                compiler, module, constraint_type)
+                compiler, module, constraint_type, tailf_ordering)
 
 
-def update_ordering_xpath(compiler, module, constraint_type):
+def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
 
     def get_xpath(compiler, stmt):
         schema_node = getattr(stmt, 'schema_node', None)
@@ -423,27 +447,44 @@ def update_ordering_xpath(compiler, module, constraint_type):
     xpath = {}
     constraint_info = getattr(compiler, constraint_type)[module]
 
-    for annotation_stmt in constraint_info:
-        stmt[0], stmt[1], cinstraint_list = constraint_info[annotation_stmt]
+    for stmt[0], stmt[1], cinstraint_list, position in constraint_info:
 
         for i in range(2):
             xpath[i] = get_xpath(compiler, stmt[i])
+
             # Skip entries with missing Xpath. Missing Xpaths might be in a
             # different module not compiled or due to other deviations.
             if xpath[i] == '':
                 break
         else:
+
+            # Track nodes that have TailF ordering annotations applied.
+            if constraint_type == "ordering_stmt_tailf":
+                if stmt[0] not in tailf_ordering:
+                    tailf_ordering[stmt[0]] = {}
+                if stmt[1] not in tailf_ordering[stmt[0]]:
+                    tailf_ordering[stmt[0]][stmt[1]] = True
+
+            # Skip entries where either node has TailF ordering annotations
+            # applied.
+            if constraint_type == "ordering_stmt_leafref":
+                if (
+                    stmt[0] in tailf_ordering and
+                    stmt[1] in tailf_ordering[stmt[0]]
+                ):
+                    continue
+
             for oper_0, sequence, oper_1 in cinstraint_list:
                 if xpath[0] == xpath[1] and oper_0 == oper_1:
                     # Skip entries with same Xpath and same operation.
                     continue
                 if sequence == 'before':
                     constraints.append((
-                        xpath[0], oper_0, xpath[1], oper_1, annotation_stmt))
+                        xpath[0], oper_0, xpath[1], oper_1, position))
                     update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
                 else:
                     constraints.append((
-                        xpath[1], oper_1, xpath[0], oper_0, annotation_stmt))
+                        xpath[1], oper_1, xpath[0], oper_0, position))
                     update_schema_tree(stmt[1], oper_1, stmt[0], oper_0)
 
     attribute_name = "ordering_xpath_leafref" \

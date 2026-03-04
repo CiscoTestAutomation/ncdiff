@@ -1448,8 +1448,8 @@ class ModelCompiler(object):
                         else:
                             self.identity_deps[b_idn].append(curr_idn)
 
-        self.ordering_stmt_leafref[module] = {}
-        self.ordering_stmt_tailf[module] = {}
+        self.ordering_stmt_leafref[module] = []
+        self.ordering_stmt_tailf[module] = []
 
         for child in vm.i_children:
             if child.keyword in statements.data_definition_keywords:
@@ -1536,11 +1536,12 @@ class ModelCompiler(object):
                         if target is not None:
                             ordering = get_tailf_ordering(
                                 self.context, ch, target)
-                            self.ordering_stmt_tailf[module.arg][ch] = (
+                            self.ordering_stmt_tailf[module.arg].append((
                                 child,
                                 target,
                                 ordering,
-                            )
+                                ch.pos,
+                            ))
                 else:
                     logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
@@ -1602,8 +1603,7 @@ class ModelCompiler(object):
                         target_stmt = self.context.check_data_tree_xpath(
                             p, leaf_statement)
                         if target_stmt is not None:
-                            self.ordering_stmt_leafref[module][
-                                leaf_statement] = (
+                            self.ordering_stmt_leafref[module].append((
                                 leaf_statement,
                                 target_stmt,
                                 [
@@ -1614,7 +1614,8 @@ class ModelCompiler(object):
                                     ('modify', 'before', 'delete'),
                                     ('delete', 'before', 'delete'),
                                 ],
-                            )
+                                sm.pos,
+                            ))
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
