@@ -108,12 +108,9 @@ class Composer(object):
             ret = re.search(Tag.BRACE[0], self.path[0])
             if ret:
                 url_to_name = {i[2]: i[0] for i in self.device.namespaces
-                               if i[1] is not None}
+                               if i[1] is not None and i[2] == ret.group(1)}
                 if ret.group(1) in url_to_name:
-                    raise ModelMissing("please load model '{}' by calling "
-                                       "method load_model() of device {}"
-                                       .format(url_to_name[ret.group(1)],
-                                               self.device))
+                    return url_to_name[ret.group(1)]
                 else:
                     raise ModelMissing("unknown model url '{}'"
                                        .format(ret.group(1)))
@@ -123,7 +120,10 @@ class Composer(object):
 
     @property
     def model_ns(self):
-        return self.device.models[self.model_name].url
+        name_to_url = {i[0]: i[2] for i in self.device.namespaces
+                       if i[1] is not None and i[0] == self.model_name}
+        return name_to_url[self.model_name] if self.model_name in name_to_url \
+            else None
 
     @property
     def is_config(self):
