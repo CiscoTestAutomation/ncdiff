@@ -39,7 +39,7 @@ ip dhcp class CLASS3
 !
 !
 login on-success log
-            """
+        """
         config_2 = """
 ip dhcp pool dhcp_1
  network 172.16.1.0 255.255.255.0
@@ -73,31 +73,10 @@ ip dhcp class CLASS3
 !
 login on-success log
 !
-            """
+        """
         expected_diff = """
-- ip dhcp pool ABC
--   network 10.0.20.0 255.255.255.0
--   class CLASS1
--     address range 10.0.20.1 10.0.20.100
--   class CLASS2
--     address range 10.0.20.101 10.0.20.200
--   class CLASS3
--     address range 10.0.20.201 10.0.20.254
-  ip dhcp pool dhcp_1
-    network 172.16.1.0 255.255.255.0
-    network 172.16.2.0 255.255.255.0 secondary
-    network 172.16.3.0 255.255.255.0 secondary
-    network 172.16.4.0 255.255.255.0 secondary
 - ip dhcp class CLASS1
 -   relay agent information
-+ ip dhcp pool ABC
-+   network 10.0.20.0 255.255.255.0
-+   class CLASS1
-+     address range 10.0.20.1 10.0.20.100
-+   class CLASS2
-+     address range 10.0.20.101 10.0.20.200
-+   class CLASS3
-+     address range 10.0.20.201 10.0.20.254
   ip dhcp class CLASS2
     relay agent information
 +     relay-information hex 01040101030402020102
@@ -2090,6 +2069,98 @@ class-map match-any FC_EF
   match protocol attribute traffic-class voip-telephony
   match protocol attribute traffic-class real-time-interactive
   match protocol attribute traffic-class signaling
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ip_dhcp_pool(self):
+        config_1 = """
+ip dhcp pool POOL_100
+  network 1.1.100.0 255.255.255.0
+  default-router 1.1.100.1
+ip dhcp pool POOL_50
+  network 1.1.50.0 255.255.255.0
+  default-router 1.1.50.1
+ip dhcp pool some_dhcp_name
+        """
+        config_2 = """
+ip dhcp pool POOL_50
+  network 1.1.50.0 255.255.255.0
+  default-router 1.1.50.1
+ip dhcp pool some_dhcp_name
+ip dhcp pool POOL_100
+  network 1.1.100.0 255.255.255.0
+  default-router 1.1.100.1
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_crypto_tls_tunnel(self):
+        config_1 = """
+crypto tls-tunnel MERAKI-PRIMARY
+  server url us.tlsgw.meraki.com port 443
+  overlay interface Loopback1000
+  local-interface Vlan1 priority 1
+  pki trustpoint CISCO_IDEVID_SUDI sign
+  shutdown
+crypto tls-tunnel test_tls_tunnel
+  server ipv4 1.1.1.1 port 443
+  overlay interface GigabitEthernet1/0/12
+  local-interface Vlan1 priority 1
+  shutdown
+        """
+        config_2 = """
+crypto tls-tunnel test_tls_tunnel
+  server ipv4 1.1.1.1 port 443
+  overlay interface GigabitEthernet1/0/12
+  local-interface Vlan1 priority 1
+  shutdown
+crypto tls-tunnel MERAKI-PRIMARY
+  server url us.tlsgw.meraki.com port 443
+  overlay interface Loopback1000
+  local-interface Vlan1 priority 1
+  pki trustpoint CISCO_IDEVID_SUDI sign
+  shutdown
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_ip_pim_rp_address(self):
+        config_1 = """
+ip pim rp-address 11.1.1.1 rp16843019
+ip pim rp-address 21.1.1.1 rp16843029
+ip pim rp-address 71.1.1.1 rp16843079
+ip pim rp-address 1.1.1.1 rp_acl
+        """
+        config_2 = """
+ip pim rp-address 1.1.1.1 rp_acl
+ip pim rp-address 71.1.1.1 rp16843079
+ip pim rp-address 11.1.1.1 rp16843019
+ip pim rp-address 21.1.1.1 rp16843029
         """
 
         running_diff = RunningConfigDiff(
