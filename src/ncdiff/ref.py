@@ -362,7 +362,7 @@ class InstanceIdentifier(IdentityRef):
                             self.cut(start_idx+1, end_idx-2, tag, 2)
                         start_idx = None
                     else:
-                        if re.search('^\[[1-9][0-9]*\]$', substring):
+                        if re.search(r'^\[[1-9][0-9]*\]$', substring):
                             numbers = substring[1:-1]
                             self.cut(start_idx+1, end_idx-1, numbers, 2)
                         else:
