@@ -2111,6 +2111,38 @@ ip dhcp pool POOL_100
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_ip_dhcp_pool_option(self):
+        config_1 = """
+ip dhcp pool 10-20
+  hardware-address aa
+  option 20 ascii 5
+  option 30 hex aa
+  option 40 ip 5.5.5.5
+  default-router 10.1.1.1
+  dns-server 171.70.168.183
+  domain-name 10-20
+        """
+        config_2 = """
+ip dhcp pool 10-20
+  hardware-address aa
+  default-router 10.1.1.1
+  dns-server 171.70.168.183
+  domain-name 10-20
+  option 20 ascii 5
+  option 30 hex aa
+  option 40 ip 5.5.5.5
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_crypto_tls_tunnel(self):
         config_1 = """
 crypto tls-tunnel MERAKI-PRIMARY
