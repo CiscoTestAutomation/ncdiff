@@ -555,7 +555,7 @@ class ContextWorker(Thread):
 
 class CompilerContext(Context):
 
-    def __init__(self, repository):
+    def __init__(self, repository, modeldevice=None):
         Context.__init__(self, repository)
         self.dependencies = None
         self.modulefile_queue = None
@@ -563,7 +563,7 @@ class CompilerContext(Context):
             self.num_threads = 2
         else:
             self.num_threads = 1
-        self._modeldevice = None
+        self.modeldevice = modeldevice
 
     def _get_latest_revision(self, modulename):
         latest = None
@@ -836,10 +836,10 @@ class CompilerContext(Context):
         return node
 
     def get_xpath_from_schema_node(self, schema_node, type=Tag.XPATH):
-        if self._modeldevice is None:
+        if self.modeldevice is None:
             return None
         else:
-            return self._modeldevice.get_xpath(schema_node, type=type, instance=False)
+            return self.modeldevice.get_xpath(schema_node, type=type, instance=False)
 
     def load_context(self):
         self.modulefile_queue = queue.Queue()
@@ -1089,7 +1089,7 @@ class ModelDownloader(object):
             'capabilities.txt',
         )
         repo = FileRepository(path=self.dir_yang)
-        self.context = CompilerContext(repository=repo)
+        self.context = CompilerContext(repository=repo, modeldevice=nc_device)
         self.download_queue = queue.Queue()
         self.num_threads = 2
 
@@ -1243,13 +1243,13 @@ class ModelCompiler(object):
         call pyang.error.err_to_str() to print out detailed error messages.
     '''
 
-    def __init__(self, folder):
+    def __init__(self, folder, context=None):
         '''
         __init__ instantiates a ModelCompiler instance.
         '''
 
         self.dir_yang = os.path.abspath(folder)
-        self.context = None
+        self.context = context
         self.module_prefixes = {}
         self.module_namespaces = {}
         self.identity_deps = {}
@@ -1566,9 +1566,9 @@ class ModelCompiler(object):
     def get_xpath_from_schema_node(self, schema_node, type=Tag.XPATH):
         from .manager import ModelDevice
 
-        if self.context._modeldevice is None:
-            self.context._modeldevice = ModelDevice(None, None)
-            self.context._modeldevice.compiler = self
+        if self.context.modeldevice is None:
+            self.context.modeldevice = ModelDevice(None, None)
+            self.context.modeldevice.compiler = self
         return self.context.get_xpath_from_schema_node(schema_node, type=type)
 
     @staticmethod
