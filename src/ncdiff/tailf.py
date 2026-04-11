@@ -8,15 +8,9 @@ from .composer import Tag
 logger = logging.getLogger(__name__)
 
 
-def is_tailf_ordering(stmt, context):
-    if isinstance(stmt.raw_keyword, tuple):
-        prefix, identifier = stmt.raw_keyword
-        m, rev = util.prefix_to_modulename_and_revision(
-            stmt.i_orig_module,
-            prefix,
-            stmt.pos,
-            context.errors,
-        )
+def is_tailf_ordering(stmt):
+    if isinstance(stmt.keyword, tuple):
+        m, identifier = stmt.keyword
         return m == 'tailf-common' and identifier in {
             'cli-diff-after', 'cli-diff-before',
             'cli-diff-create-after', 'cli-diff-create-before',
@@ -27,6 +21,13 @@ def is_tailf_ordering(stmt, context):
         }
     else:
         return False
+
+
+def is_deprecated_without_replacement(stmt):
+    for substmt in stmt.search(('Cisco-IOS-XE-types', 'yang-meta-data')):
+        if substmt.arg == 'deprecated-without-replacement':
+            return True
+    return False
 
 
 def get_tailf_ordering(context, stmt, target_stmt):

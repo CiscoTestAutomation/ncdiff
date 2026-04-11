@@ -21,6 +21,7 @@ except ImportError:
 
 from .errors import ModelError
 from .composer import Tag
+from .tailf import is_deprecated_without_replacement
 from .tailf import is_tailf_ordering, get_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
 
@@ -1262,6 +1263,7 @@ class ModelCompiler(object):
 
         self.exclude_obsolete = False
         self.exclude_deprecated = False
+        self.include_deprecated_without_replacement = False
         self.include_xpaths = set()
         self.exclude_xpaths = set()
 
@@ -1476,6 +1478,8 @@ class ModelCompiler(object):
         sm = child.search_one('status')
         if sm is not None and sm.arg in ['deprecated', 'obsolete']:
             n.set('status', sm.arg)
+        if is_deprecated_without_replacement(child):
+            n.set('deprecated-without-replacement', 'true')
 
         if self.skip(child, n):
             parent.remove(n)
@@ -1528,7 +1532,7 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    if not is_tailf_ordering(ch, self.context):
+                    if not is_tailf_ordering(ch):
                         add_tailf_annotation(self.module_namespaces, ch, n)
                     else:
                         target = self.context.check_data_tree_xpath(
@@ -1719,11 +1723,16 @@ class ModelCompiler(object):
             return True
 
         status = schema_node.get('status', default=None)
+        deprecated_without_replacement = schema_node.get(
+            'deprecated-without-replacement', default=None)
         if (
             status == 'obsolete' and
             self.exclude_obsolete or
             status == 'deprecated' and
-            self.exclude_deprecated
+            self.exclude_deprecated and not (
+                self.include_deprecated_without_replacement and
+                deprecated_without_replacement == 'true'
+            )
         ):
             return True
         return False

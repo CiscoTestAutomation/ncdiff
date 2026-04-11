@@ -7,6 +7,7 @@ from ncdiff.composer import Tag
 from ncdiff.model import ModelCompiler
 from ncdiff.tailf import is_tailf_ordering, get_tailf_ordering
 from ncdiff.tailf import is_symmetric_tailf_ordering
+from ncdiff.tailf import is_deprecated_without_replacement
 
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,9 @@ class TestNative(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.compiler = ModelCompiler(os.path.join(curr_dir, 'yang'))
+        cls.compiler.exclude_obsolete = True
+        cls.compiler.exclude_deprecated = True
+        cls.compiler.include_deprecated_without_replacement = True
         delete_xml_files(cls.compiler.dir_yang)
         cls.native = cls.compiler.compile('Cisco-IOS-XE-native')
         # cls.oc_interfaces = cls.compiler.compile('openconfig-interfaces')
@@ -445,7 +449,7 @@ class TestNative(unittest.TestCase):
             self.assertEqual(len(stmts), 1)
             stmt = stmts[0]
         node = stmt
-        func_result = is_tailf_ordering(node, self.compiler.context)
+        func_result = is_tailf_ordering(node)
         self.assertFalse(func_result)
 
         stmts = [i for i in node.substmts
@@ -454,7 +458,7 @@ class TestNative(unittest.TestCase):
                  "/ios-eth:carrier-delay/ios-eth:seconds"]
         self.assertEqual(len(stmts), 1)
         annotation = stmts[0]
-        func_result = is_tailf_ordering(annotation, self.compiler.context)
+        func_result = is_tailf_ordering(annotation)
         self.assertTrue(func_result)
 
     def test_get_tailf_ordering(self):
@@ -545,6 +549,47 @@ class TestNative(unittest.TestCase):
             annotation, node)
         func_result = is_symmetric_tailf_ordering(self.compiler.context, annotation, target)
         self.assertFalse(func_result)
+
+    def test_is_deprecated_without_replacement(self):
+        # Line 1523 in Cisco-IOS-XE-lisp.yang:
+        # grouping router-lisp-ip-grouping {
+        #   leaf alt-vrf {
+        #     description
+        #       "Activate LISP-ALT functionality in VRF";
+        #     status deprecated;
+        #     ios-types:yang-meta-data "deprecated-without-replacement";
+        #     type string;
+        #   }
+        #   ...
+        # }
+        module_stmt = self.compiler.context.get_module('Cisco-IOS-XE-native')
+        stmts = [i for i in module_stmt.substmts if i.arg == "native"]
+        self.assertEqual(len(stmts), 1)
+        stmt = stmts[0]
+        for arg in [
+            "router",
+            "lisp",
+            "ipv4",
+            "alt-vrf",
+        ]:
+            stmts = [i for i in stmt.i_children if i.arg == arg]
+            self.assertEqual(len(stmts), 1)
+            stmt = stmts[0]
+
+        # Node ipv4 does not have deprecated-without-replacement
+        func_result = is_deprecated_without_replacement(stmt.parent)
+        self.assertFalse(func_result)
+
+        # Node alt-vrf has deprecated-without-replacement
+        func_result = is_deprecated_without_replacement(stmt)
+        self.assertTrue(func_result)
+
+        # Check that the alt-vrf node is present in the compiled tree, even
+        # though it is deprecated
+        nodes = self.native.tree.xpath(
+            "//ios:native/ios:router/ios-lisp:lisp/ios-lisp:ipv4/ios-lisp:alt-vrf",
+            namespaces=self.native.prefixes)
+        self.assertEqual(len(nodes), 1)
 
 
 class TestOpenConfigInterfaces(unittest.TestCase):
