@@ -680,8 +680,8 @@ class CompilerContext(Context):
             for stmt in module_statement.search(node_name):
                 for substmt in stmt.substmts:
                     if (
+                        isinstance(substmt.keyword, tuple) and
                         'tailf' in substmt.keyword[0] and
-                        len(substmt.keyword) == 2 and
                         substmt.keyword[1] == 'hidden'
                     ):
                         break
@@ -876,7 +876,11 @@ class CompilerContext(Context):
 
         def tailf_annotate_module(context, module_stmt):
             for substmt in module_stmt.substmts:
-                if substmt.keyword == ('tailf', 'annotate-module'):
+                if (
+                    isinstance(substmt.keyword, tuple) and
+                    'tailf' in substmt.keyword[0] and
+                    substmt.keyword[1] == 'annotate-module'
+                ):
                     annotated_module = context.get_module(substmt.arg)
                     if annotated_module is None:
                         logger.warning("Failed to find annotated module "
@@ -1527,7 +1531,10 @@ class ModelCompiler(object):
 
         # Tailf annotations
         for ch in child.substmts:
-            if isinstance(ch.keyword, tuple) and 'tailf' in ch.keyword[0]:
+            if (
+                isinstance(ch.keyword, tuple) and
+                ch.keyword[0] == 'tailf-common'
+            ):
                 if (
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2

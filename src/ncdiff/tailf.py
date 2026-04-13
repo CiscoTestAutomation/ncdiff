@@ -466,8 +466,8 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                 if stmt[1] not in tailf_ordering[stmt[0]]:
                     tailf_ordering[stmt[0]][stmt[1]] = True
 
-            # Skip entries where either node has TailF ordering annotations
-            # applied.
+            # Skip leafref entries where it already has TailF ordering
+            # annotations applied.
             if constraint_type == "ordering_stmt_leafref":
                 if (
                     stmt[0] in tailf_ordering and
@@ -476,9 +476,11 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                     continue
 
             for oper_0, sequence, oper_1 in cinstraint_list:
+
+                # Skip entries with same Xpath and same operation.
                 if xpath[0] == xpath[1] and oper_0 == oper_1:
-                    # Skip entries with same Xpath and same operation.
                     continue
+
                 if sequence == 'before':
                     constraints.append((
                         xpath[0], oper_0, xpath[1], oper_1, position))
