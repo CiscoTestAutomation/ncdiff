@@ -2081,6 +2081,84 @@ class-map match-any FC_EF
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_classmap_match_access_group(self):
+        config_1 = """
+class-map match-any CM_Q_PRI
+  match dscp af21
+  match vlan  101
+  match access-group name ACL_Q_A
+class-map match-any CM_Q_SET
+  match dscp cs1
+  match vlan  102
+  match access-group name ACL_Q_A
+        """
+        config_2 = """
+class-map match-any CM_Q_PRI
+  match access-group name ACL_Q_A
+  match dscp af21
+  match vlan  101
+class-map match-any CM_Q_SET
+  match access-group name ACL_Q_A
+  match dscp cs1
+  match vlan  102
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_classmap_match_result_type(self):
+        config_1 = """
+class-map type control subscriber match-all CM_CTRL
+ match activated-service-template ST_CTRL_A
+ match authorization-status authorized
+ match device-type "CAMERA"
+ match device-type regex "PHONE"
+ match method dot1x
+ match method mab
+ match result-type aaa-timeout
+ match result-type method dot1x aaa-timeout
+ match result-type method dot1x agent-not-found
+ match result-type method dot1x authoritative
+ match result-type method dot1x method-timeout
+ match result-type method mab aaa-timeout
+ match result-type method mab authoritative
+ no-match activated-service-template ST_CTRL_B
+ no-match result-type aaa-timeout
+        """
+        config_2 = """
+class-map type control subscriber match-all CM_CTRL
+ match activated-service-template ST_CTRL_A
+ match authorization-status authorized
+ match device-type "CAMERA"
+ match device-type regex "PHONE"
+ match method dot1x
+ match method mab
+ match result-type method dot1x aaa-timeout
+ match result-type method dot1x agent-not-found
+ match result-type method dot1x authoritative
+ match result-type method dot1x method-timeout
+ match result-type method mab aaa-timeout
+ match result-type method mab authoritative
+ match result-type aaa-timeout
+ no-match activated-service-template ST_CTRL_B
+ no-match result-type aaa-timeout
+        """
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_ip_dhcp_pool(self):
         config_1 = """
 ip dhcp pool POOL_100
