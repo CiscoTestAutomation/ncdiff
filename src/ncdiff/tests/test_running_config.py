@@ -2115,10 +2115,6 @@ class-map match-any CM_Q_SET
     def test_classmap_match_result_type(self):
         config_1 = """
 class-map type control subscriber match-all CM_CTRL
- match activated-service-template ST_CTRL_A
- match authorization-status authorized
- match device-type "CAMERA"
- match device-type regex "PHONE"
  match method dot1x
  match method mab
  match result-type aaa-timeout
@@ -2128,8 +2124,12 @@ class-map type control subscriber match-all CM_CTRL
  match result-type method dot1x method-timeout
  match result-type method mab aaa-timeout
  match result-type method mab authoritative
- no-match activated-service-template ST_CTRL_B
  no-match result-type aaa-timeout
+ match activated-service-template ST_CTRL_A
+ match authorization-status authorized
+ match device-type regex "PHONE"
+ match device-type "CAMERA"
+ no-match activated-service-template ST_CTRL_B
         """
         config_2 = """
 class-map type control subscriber match-all CM_CTRL
