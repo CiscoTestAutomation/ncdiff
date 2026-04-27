@@ -1539,7 +1539,12 @@ class ModelCompiler(object):
                     ch.keyword[0] in self.module_namespaces and
                     len(ch.keyword) == 2
                 ):
-                    if not is_tailf_ordering(ch):
+                    if ch.keyword[1] == 'non-strict-leafref':
+                        p = ch.search_one('path')
+                        if p is not None:
+                            self.set_ordering_stmt_leafref(
+                                module.arg, child, p, n, ch.pos)
+                    elif not is_tailf_ordering(ch):
                         add_tailf_annotation(self.module_namespaces, ch, n)
                     else:
                         target = self.context.check_data_tree_xpath(
@@ -1600,6 +1605,27 @@ class ModelCompiler(object):
         else:
             node.set('access', 'read-only')
 
+    def set_ordering_stmt_leafref(self, module, leaf_statement, path_statement,
+                                  leaf_node, pos):
+        # Consider leafref as a dpendency for ordering purpose
+        if not self.skip(leaf_statement, leaf_node):
+            target_stmt = self.context.check_data_tree_xpath(
+                path_statement, leaf_statement)
+            if target_stmt is not None:
+                self.ordering_stmt_leafref[module].append((
+                    leaf_statement,
+                    target_stmt,
+                    [
+                        ('create', 'after', 'create'),
+                        ('modify', 'after', 'create'),
+                        ('create', 'after', 'modify'),
+                        ('delete', 'before', 'modify'),
+                        ('modify', 'before', 'delete'),
+                        ('delete', 'before', 'delete'),
+                    ],
+                    pos,
+                ))
+
     def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
         sm = leaf_statement.search_one('type')
         if sm is None:
@@ -1608,25 +1634,8 @@ class ModelCompiler(object):
             if sm.arg == 'leafref':
                 p = sm.search_one('path')
                 if p is not None:
-
-                    # Consider leafref as a dpendency for ordering purpose
-                    if not self.skip(leaf_statement, leaf_node):
-                        target_stmt = self.context.check_data_tree_xpath(
-                            p, leaf_statement)
-                        if target_stmt is not None:
-                            self.ordering_stmt_leafref[module].append((
-                                leaf_statement,
-                                target_stmt,
-                                [
-                                    ('create', 'after', 'create'),
-                                    ('modify', 'after', 'create'),
-                                    ('create', 'after', 'modify'),
-                                    ('delete', 'before', 'modify'),
-                                    ('modify', 'before', 'delete'),
-                                    ('delete', 'before', 'delete'),
-                                ],
-                                sm.pos,
-                            ))
+                    self.set_ordering_stmt_leafref(
+                        module, leaf_statement, p, leaf_node, sm.pos)
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
