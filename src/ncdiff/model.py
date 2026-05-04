@@ -1540,10 +1540,14 @@ class ModelCompiler(object):
                     len(ch.keyword) == 2
                 ):
                     if ch.keyword[1] == 'non-strict-leafref':
-                        p = ch.search_one('path')
-                        if p is not None:
-                            self.set_ordering_stmt_leafref(
-                                module.arg, child, p, n, ch.pos)
+                        # p = ch.search_one('path')
+                        # if p is not None:
+                        #     self.set_ordering_stmt_leafref(
+                        #         module.arg, child, p, n, ch.pos)
+                        # Do not treat non-strict-leafref as a leafref for now
+                        # as it is not clear how this may impact the CLI
+                        # ordering.
+                        pass
                     elif not is_tailf_ordering(ch):
                         add_tailf_annotation(self.module_namespaces, ch, n)
                     else:
