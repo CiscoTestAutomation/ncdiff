@@ -138,6 +138,9 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *netconf-yang'), 0),
     (re.compile(r'^ *summary-address '), 1),
     (re.compile(r'^ *member vni '), 1),
+    (re.compile(r'^ *[0-9]+ remark '), 1),
+    (re.compile(r'^ *[0-9]+ permit '), 1),
+    (re.compile(r'^ *[0-9]+ deny '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing

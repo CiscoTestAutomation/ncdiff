@@ -2391,3 +2391,29 @@ policy-map AutoQos-4.0-Output-Policy
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_access_list_permit(self):
+        config_1 = """
+ip access-list role-based MERAKI_RB_V4
+ 10 remark meraki-acl
+ 10 permit tcp dst eq 443
+ 20 permit udp src eq ntp dst range 2000 2010
+ 30 deny tcp dst range 8080 8088 established log
+        """
+        config_2 = """
+ip access-list role-based MERAKI_RB_V4
+ 10 permit tcp dst eq 443
+ 10 remark meraki-acl
+ 20 permit udp src eq ntp dst range 2000 2010
+ 30 deny tcp dst range 8080 8088 established log
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
