@@ -79,7 +79,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *parameter-map type '), 0),
     (re.compile(r'^ *match '), 1),
     (re.compile(r'^ *no-match '), 1),
-    (re.compile(r'^ *collect connection '), 1),
+    (re.compile(r'^ *collect '), 1),
     (re.compile(r'^ *l2nat instance '), 0),
     (re.compile(r'^ *inside from host '), 1),
     (re.compile(r'^ *outside from host '), 1),
@@ -127,6 +127,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *ip dhcp pool '), 0),
     (re.compile(r'^ *ipv6 dhcp pool '), 0),
     (re.compile(r'^ *bandwidth remaining ratio '), 2),
+    (re.compile(r'^ *queue-limit '), 2),
     (re.compile(r'^ *ntp server '), 0),
     (re.compile(r'^ *mpls mldp static '), 0),
     (re.compile(r'^ *mpls ldp advertise-labels for '), 0),
@@ -137,6 +138,9 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *netconf-yang'), 0),
     (re.compile(r'^ *summary-address '), 1),
     (re.compile(r'^ *member vni '), 1),
+    (re.compile(r'^ *[0-9]+ remark '), 1),
+    (re.compile(r'^ *[0-9]+ permit '), 1),
+    (re.compile(r'^ *[0-9]+ deny '), 1),
 ]
 
 # Some commands can be overwritten without a no command. For example, changing

@@ -1352,6 +1352,57 @@ flow record fr_1
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_flow_record_collect(self):
+        config_1 = """
+flow record STEALTHWATCH_OUT
+ description Output Flow Record for Stealthwatch
+ match flow cts destination group-tag
+ match flow cts source group-tag
+ match flow direction
+ match interface output
+ match ipv4 destination address
+ match ipv4 protocol
+ match ipv4 source address
+ match ipv4 tos
+ match ipv4 ttl
+ match transport destination-port
+ match transport source-port
+ collect counter bytes long
+ collect counter packets long
+ collect interface input
+ collect timestamp absolute first
+ collect timestamp absolute last
+"""
+        config_2 = """
+flow record STEALTHWATCH_OUT
+ description Output Flow Record for Stealthwatch
+ match flow cts destination group-tag
+ match flow cts source group-tag
+ match flow direction
+ match interface output
+ match ipv4 destination address
+ match ipv4 protocol
+ match ipv4 source address
+ match ipv4 tos
+ match ipv4 ttl
+ match transport destination-port
+ match transport source-port
+ collect counter packets long
+ collect interface input
+ collect timestamp absolute first
+ collect timestamp absolute last
+ collect counter bytes long
+"""
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_neighbor(self):
         config_1 = """
 router bgp 1.1
@@ -2002,6 +2053,28 @@ device classifier
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
 
+    def test_device_classifier_lldp_tlv_type(self):
+        config_1 = """
+device classifier condition COND4 op OR
+ lldp tlv-type 5 value Regex VOIP.*
+ lldp tlv-type 127 value Regex TABLET.*
+        """
+        config_2 = """
+device classifier condition COND4 op OR
+ lldp tlv-type 127 value Regex TABLET.*
+ lldp tlv-type 5 value Regex VOIP.*
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
     def test_coexist_short_positive_commands_1(self):
         config_1 = """
 ip routing
@@ -2271,6 +2344,68 @@ ip pim rp-address 1.1.1.1 rp_acl
 ip pim rp-address 71.1.1.1 rp16843079
 ip pim rp-address 11.1.1.1 rp16843019
 ip pim rp-address 21.1.1.1 rp16843029
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_policy_map_queue_limit(self):
+        config_1 = """
+policy-map AutoQos-4.0-Output-Policy
+ class AutoQos-4.0-Output-Priority-Queue
+  priority level 1 percent 30
+ class AutoQos-4.0-Output-Control-Mgmt-Queue
+  bandwidth remaining percent 10
+  queue-limit dscp cs2 percent 80
+  queue-limit dscp cs3 percent 90
+  queue-limit dscp cs6 percent 100
+  queue-limit dscp cs7 percent 100
+  queue-buffers ratio 10
+        """
+        config_2 = """
+policy-map AutoQos-4.0-Output-Policy
+ class AutoQos-4.0-Output-Priority-Queue
+  priority level 1 percent 30
+ class AutoQos-4.0-Output-Control-Mgmt-Queue
+  bandwidth remaining percent 10
+  queue-limit dscp cs3 percent 90
+  queue-limit dscp cs6 percent 100
+  queue-limit dscp cs7 percent 100
+  queue-limit dscp cs2 percent 80
+  queue-buffers ratio 10
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_access_list_permit(self):
+        config_1 = """
+ip access-list role-based MERAKI_RB_V4
+ 10 remark meraki-acl
+ 10 permit tcp dst eq 443
+ 20 permit udp src eq ntp dst range 2000 2010
+ 30 deny tcp dst range 8080 8088 established log
+        """
+        config_2 = """
+ip access-list role-based MERAKI_RB_V4
+ 10 permit tcp dst eq 443
+ 10 remark meraki-acl
+ 20 permit udp src eq ntp dst range 2000 2010
+ 30 deny tcp dst range 8080 8088 established log
         """
 
         running_diff = RunningConfigDiff(
