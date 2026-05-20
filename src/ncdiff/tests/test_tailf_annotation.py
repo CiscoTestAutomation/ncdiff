@@ -310,7 +310,7 @@ class TestNative(unittest.TestCase):
             if i[0] is leafref
         ]
         self.assertEqual(len(tuples), 1)
-        leafref_stmt, target_stmt, ordering, position = tuples[0]
+        leafref_stmt, target_stmt, ordering, xpath_stmt = tuples[0]
 
         type_stmt = leafref.search_one('type')
         self.assertIsNotNone(type_stmt)
@@ -322,7 +322,7 @@ class TestNative(unittest.TestCase):
         self.assertIs(leafref, leafref_stmt)
         self.assertIs(target, target_stmt)
         self.assertIsInstance(ordering, list)
-        self.assertIn('Cisco-IOS-XE-parser.yang:160', str(position))
+        self.assertIn('Cisco-IOS-XE-parser.yang:161', str(xpath_stmt.pos))
 
     def test_ordering_stmt_tailf(self):
         self.assertIn('Cisco-IOS-XE-native', self.compiler.ordering_stmt_tailf)
@@ -395,11 +395,11 @@ class TestNative(unittest.TestCase):
             'Cisco-IOS-XE-sla-ann.yang:76',
             'Cisco-IOS-XE-sla-ann.yang:79',
         ]
-        for node_stmt, target_stmt, ordering, position in tuples:
+        for node_stmt, target_stmt, ordering, xpath_stmt in tuples:
             self.assertIs(target, target_stmt)
             self.assertIsInstance(ordering, list)
             for p in positions:
-                if p in str(position):
+                if p in str(xpath_stmt.pos):
                     positions.remove(p)
                     break
         self.assertEqual(len(positions), 0)

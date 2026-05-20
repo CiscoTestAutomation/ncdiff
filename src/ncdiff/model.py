@@ -24,6 +24,7 @@ from .composer import Tag
 from .tailf import is_deprecated_without_replacement
 from .tailf import is_tailf_ordering, get_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
+from .xpath import chk_xpath_path
 
 
 # create a logger for this module
@@ -715,29 +716,26 @@ class CompilerContext(Context):
 
         p = xpath_parser.parse(xpath_stmt.arg)
         if isinstance(p, list):
-            node = xp.chk_xpath_path(
+            node = chk_xpath_path(
                 self,
-                xpath_stmt.i_orig_module,
-                xpath_stmt.pos,
+                xpath_stmt,
                 node_stmt,
                 node_stmt,
                 p,
             )
         elif isinstance(p, tuple):
             if p[0] == 'absolute':
-                node = xp.chk_xpath_path(
+                node = chk_xpath_path(
                     self,
-                    xpath_stmt.i_orig_module,
-                    xpath_stmt.pos,
+                    xpath_stmt,
                     node_stmt,
                     'root',
                     p[1],
                 )
             elif p[0] == 'relative':
-                node = xp.chk_xpath_path(
+                node = chk_xpath_path(
                     self,
-                    xpath_stmt.i_orig_module,
-                    xpath_stmt.pos,
+                    xpath_stmt,
                     node_stmt,
                     node_stmt,
                     p[1],
@@ -1263,6 +1261,8 @@ class ModelCompiler(object):
         self.ordering_stmt_tailf = {}
         self.ordering_xpath_leafref = {}
         self.ordering_xpath_tailf = {}
+        self.ordering_match = {}
+        self.ordering = {}
         self._dependencies = {}
 
         self.exclude_obsolete = False
@@ -1456,6 +1456,8 @@ class ModelCompiler(object):
 
         self.ordering_stmt_leafref[module] = []
         self.ordering_stmt_tailf[module] = []
+        self.ordering_match[module] = []
+        self.ordering[module] = {}
 
         for child in vm.i_children:
             if child.keyword in statements.data_definition_keywords:
@@ -1540,17 +1542,15 @@ class ModelCompiler(object):
                     len(ch.keyword) == 2
                 ):
                     if ch.keyword[1] == 'non-strict-leafref':
-                        # p = ch.search_one('path')
-                        # if p is not None:
-                        #     self.set_ordering_stmt_leafref(
-                        #         module.arg, child, p, n, ch.pos)
                         # Do not treat non-strict-leafref as a leafref for now
                         # as it is not clear how this may impact the CLI
                         # ordering.
+                        # p = ch.search_one('path')
+                        # if p is not None:
+                        #     self.set_ordering_stmt_leafref(
+                        #         module.arg, child, p, n)
                         pass
-                    elif not is_tailf_ordering(ch):
-                        add_tailf_annotation(self.module_namespaces, ch, n)
-                    else:
+                    elif is_tailf_ordering(ch):
                         target = self.context.check_data_tree_xpath(
                             ch, child)
                         if target is not None:
@@ -1560,8 +1560,10 @@ class ModelCompiler(object):
                                 child,
                                 target,
                                 ordering,
-                                ch.pos,
+                                ch,
                             ))
+                    else:
+                        add_tailf_annotation(self.module_namespaces, ch, n)
                 else:
                     logger.warning("Unknown Tailf annotation at {}, "
                                    "keyword = {}"
@@ -1610,7 +1612,7 @@ class ModelCompiler(object):
             node.set('access', 'read-only')
 
     def set_ordering_stmt_leafref(self, module, leaf_statement, path_statement,
-                                  leaf_node, pos):
+                                  leaf_node):
         # Consider leafref as a dpendency for ordering purpose
         if not self.skip(leaf_statement, leaf_node):
             target_stmt = self.context.check_data_tree_xpath(
@@ -1627,7 +1629,7 @@ class ModelCompiler(object):
                         ('modify', 'before', 'delete'),
                         ('delete', 'before', 'delete'),
                     ],
-                    pos,
+                    path_statement,
                 ))
 
     def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
@@ -1639,7 +1641,7 @@ class ModelCompiler(object):
                 p = sm.search_one('path')
                 if p is not None:
                     self.set_ordering_stmt_leafref(
-                        module, leaf_statement, p, leaf_node, sm.pos)
+                        module, leaf_statement, p, leaf_node)
 
                     # Try to make the path as compact as possible.
                     # Remove local prefixes, and only use prefix when
@@ -1742,6 +1744,7 @@ class ModelCompiler(object):
         if getattr(statement, "i_not_implemented", None) is True:
             return True
 
+        # Statement status is checked
         status = schema_node.get('status', default=None)
         deprecated_without_replacement = schema_node.get(
             'deprecated-without-replacement', default=None)

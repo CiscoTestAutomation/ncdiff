@@ -1,11 +1,24 @@
 import logging
 from os import path
 from lxml import etree
-from pyang import util
+from pyang import util, statements
 
 from .composer import Tag
 
 logger = logging.getLogger(__name__)
+
+
+DEPENDENCY_TYPE = {
+    ("create", "create"): 1,
+    ("create", "delete"): 2,
+    ("create", "modify"): 4,
+    ("delete", "create"): 8,
+    ("delete", "delete"): 16,
+    ("delete", "modify"): 32,
+    ("modify", "create"): 64,
+    ("modify", "delete"): 128,
+    ("modify", "modify"): 256,
+}
 
 
 def is_tailf_ordering(stmt):
@@ -250,6 +263,7 @@ def get_tailf_ordering(context, stmt, target_stmt):
             'cli-trigger-on-all',
         }
         substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        # This is the ordering retrived from TailF confd test result:
         ordering = [
             ('create', 'after', 'create'),
             ('modify', 'after', 'create'),
@@ -432,23 +446,23 @@ def set_ordering_xpath(compiler, module):
                 compiler, module, constraint_type, tailf_ordering)
 
 
+def get_xpath(compiler, stmt):
+    schema_node = getattr(stmt, 'schema_node', None)
+    if schema_node is None:
+        return ''
+    if not hasattr(stmt, 'schema_xpath'):
+        stmt.schema_xpath = compiler.get_xpath_from_schema_node(
+            schema_node, type=Tag.LXML_XPATH)
+    return stmt.schema_xpath
+
+
 def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
-
-    def get_xpath(compiler, stmt):
-        schema_node = getattr(stmt, 'schema_node', None)
-        if schema_node is None:
-            return ''
-        if not hasattr(stmt, 'schema_xpath'):
-            stmt.schema_xpath = compiler.get_xpath_from_schema_node(
-                schema_node, type=Tag.LXML_XPATH)
-        return stmt.schema_xpath
-
     constraints = []
     stmt = {}
     xpath = {}
     constraint_info = getattr(compiler, constraint_type)[module]
 
-    for stmt[0], stmt[1], cinstraint_list, position in constraint_info:
+    for stmt[0], stmt[1], cinstraint_list, xpath_stmt in constraint_info:
 
         for i in range(2):
             xpath[i] = get_xpath(compiler, stmt[i])
@@ -475,6 +489,10 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                 ):
                     continue
 
+            ordering_match = set_ordering_match(compiler, module, xpath_stmt)
+            x0_before_x1 = 0
+            x1_before_x0 = 0
+
             for oper_0, sequence, oper_1 in cinstraint_list:
 
                 # Skip entries with same Xpath and same operation.
@@ -483,17 +501,67 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
 
                 if sequence == 'before':
                     constraints.append((
-                        xpath[0], oper_0, xpath[1], oper_1, position))
+                        xpath[0], oper_0, xpath[1], oper_1, xpath_stmt))
                     update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
+                    x0_before_x1 += DEPENDENCY_TYPE[(oper_0, oper_1)]
                 else:
                     constraints.append((
-                        xpath[1], oper_1, xpath[0], oper_0, position))
+                        xpath[1], oper_1, xpath[0], oper_0, xpath_stmt))
                     update_schema_tree(stmt[1], oper_1, stmt[0], oper_0)
+                    x1_before_x0 += DEPENDENCY_TYPE[(oper_1, oper_0)]
+
+            if hasattr(compiler, "ordering") and module in compiler.ordering:
+                if x0_before_x1 > 0:
+                    if xpath[0] not in compiler.ordering[module]:
+                        compiler.ordering[module][xpath[0]] = []
+                    compiler.ordering[module][xpath[0]].append(
+                        (xpath[1], f"{x0_before_x1:03x}", ordering_match, "1")
+                    )
+                if x1_before_x0 > 0:
+                    if xpath[1] not in compiler.ordering[module]:
+                        compiler.ordering[module][xpath[1]] = []
+                    compiler.ordering[module][xpath[1]].append(
+                        (xpath[0], f"{x1_before_x0:03x}", ordering_match, "0")
+                    )
 
     attribute_name = "ordering_xpath_leafref" \
         if constraint_type == "ordering_stmt_leafref" \
         else "ordering_xpath_tailf"
     getattr(compiler, attribute_name)[module] = constraints
+
+
+
+
+def set_ordering_match(compiler, module, xpath_stmt):
+    if (
+        not hasattr(xpath_stmt, 'ordering_match') or
+        module not in compiler.ordering_match
+    ):
+        return None
+    match_table_indexes = []
+    for node_0, operator, node_1, function in xpath_stmt.ordering_match:
+        if isinstance(node_1, str):
+            item = (
+                get_xpath(compiler, node_0),
+                operator,
+                node_1,
+                function,
+            )
+        else:
+            item = (
+                get_xpath(compiler, node_0),
+                operator,
+                get_xpath(compiler, node_1),
+                function,
+            )
+
+        if get_xpath(compiler, node_1) == '':
+            compiler.xpath_stmt = xpath_stmt
+
+        if item not in compiler.ordering_match[module]:
+            compiler.ordering_match[module].append(item)
+        match_table_indexes.append(compiler.ordering_match[module].index(item))
+    return " ".join(map(str, match_table_indexes))
 
 
 def update_schema_tree(stmt_0, oper_0, stmt_1, oper_1):
