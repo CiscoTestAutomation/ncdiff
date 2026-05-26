@@ -1611,13 +1611,27 @@ class ModelCompiler(object):
         else:
             node.set('access', 'read-only')
 
+    @staticmethod
+    def require_instance(statement):
+        sm = statement.search_one('type')
+        if sm is not None and sm.arg in ['leafref', 'instance-identifier']:
+            instance_stmt = sm.search_one('require-instance')
+            if instance_stmt is not None and instance_stmt.arg == 'false':
+                return False
+        else:
+            return None
+        return True
+
     def set_ordering_stmt_leafref(self, module, leaf_statement, path_statement,
                                   leaf_node):
         # Consider leafref as a dpendency for ordering purpose
         if not self.skip(leaf_statement, leaf_node):
             target_stmt = self.context.check_data_tree_xpath(
                 path_statement, leaf_statement)
-            if target_stmt is not None:
+            if (
+                target_stmt is not None and
+                self.require_instance(leaf_statement) is True
+            ):
                 self.ordering_stmt_leafref[module].append((
                     leaf_statement,
                     target_stmt,
@@ -1631,6 +1645,16 @@ class ModelCompiler(object):
                     ],
                     path_statement,
                 ))
+
+                for attr in ['raw_ordering_match', 'ordering_match']:
+                    if not hasattr(path_statement, attr):
+                        setattr(path_statement, attr, [])
+                item = (target_stmt, "=", leaf_statement)
+                if item not in path_statement.raw_ordering_match:
+                    path_statement.raw_ordering_match.append(item)
+                item = (target_stmt, "=", leaf_statement, None)
+                if item not in path_statement.ordering_match:
+                    path_statement.ordering_match.append(item)
 
     def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
         sm = leaf_statement.search_one('type')
