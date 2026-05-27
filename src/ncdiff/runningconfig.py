@@ -76,6 +76,7 @@ ORDERLESS_COMMANDS = [
     (re.compile(r'^ *service-template '), 0),
     (re.compile(r'^ *redundancy'), 0),
     (re.compile(r'^ *username '), 0),
+    (re.compile(r'^ *route-map '), 0),
     (re.compile(r'^ *parameter-map type '), 0),
     (re.compile(r'^ *match '), 1),
     (re.compile(r'^ *no-match '), 1),

@@ -2417,3 +2417,43 @@ ip access-list role-based MERAKI_RB_V4
         self.assertEqual(running_diff.diff_reverse, None)
         self.assertEqual(running_diff.cli, '')
         self.assertEqual(running_diff.cli_reverse, '')
+
+    def test_route_map(self):
+        config_1 = """
+route-map BGP-TO-OSPF-VRF-FABRIC_VRF-v4 permit 10
+ match ip address prefix-list BGP-TO-OSPF-VRF-FABRIC_VRF-v4
+!
+route-map redistribute-static-over-ospf deny 1
+ match tag 2896997548
+!
+route-map redistribute-static-over-ospf permit 2
+ match ip address prefix-list redistribute-static-over-ospf
+!
+route-map BGP-TO-OSPF-VRF-FABRIC_VRF-v6 permit 10
+ match ipv6 address prefix-list BGP-TO-OSPF-VRF-FABRIC_VRF-v6
+!
+        """
+        config_2 = """
+route-map redistribute-static-over-ospf deny 1
+ match tag 2896997548
+!
+route-map redistribute-static-over-ospf permit 2
+ match ip address prefix-list redistribute-static-over-ospf
+!
+route-map BGP-TO-OSPF-VRF-FABRIC_VRF-v4 permit 10
+ match ip address prefix-list BGP-TO-OSPF-VRF-FABRIC_VRF-v4
+!
+route-map BGP-TO-OSPF-VRF-FABRIC_VRF-v6 permit 10
+ match ipv6 address prefix-list BGP-TO-OSPF-VRF-FABRIC_VRF-v6
+!
+        """
+
+        running_diff = RunningConfigDiff(
+            running1=config_1,
+            running2=config_2,
+        )
+        self.assertFalse(running_diff)
+        self.assertEqual(running_diff.diff, None)
+        self.assertEqual(running_diff.diff_reverse, None)
+        self.assertEqual(running_diff.cli, '')
+        self.assertEqual(running_diff.cli_reverse, '')
