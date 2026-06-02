@@ -462,7 +462,7 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
     xpath = {}
     constraint_info = getattr(compiler, constraint_type)[module]
 
-    for stmt[0], stmt[1], cinstraint_list, xpath_stmt in constraint_info:
+    for stmt[0], stmt[1], constraint_list, xpath_stmt in constraint_info:
 
         for i in range(2):
             xpath[i] = get_xpath(compiler, stmt[i])
@@ -493,7 +493,7 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
             x0_before_x1 = 0
             x1_before_x0 = 0
 
-            for oper_0, sequence, oper_1 in cinstraint_list:
+            for oper_0, sequence, oper_1 in constraint_list:
 
                 # Skip entries with same Xpath and same operation.
                 if xpath[0] == xpath[1] and oper_0 == oper_1:
@@ -511,6 +511,19 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                     x1_before_x0 += DEPENDENCY_TYPE[(oper_1, oper_0)]
 
             if hasattr(compiler, "ordering") and module in compiler.ordering:
+
+                # If xpath[0] and xpath[1] are the same, we only add one entry
+                # to the ordering, and we consolidate x0_before_x1 and
+                # x1_before_x0 into one entry. This is because if they are the
+                # same, they refer to the same node, and we want to avoid
+                # adding duplicate entries in the ordering.
+                if (
+                    xpath[0] == xpath[1] and
+                    x1_before_x0 > 0
+                ):
+                    x0_before_x1 |= x1_before_x0
+                    x1_before_x0 = 0
+
                 if x0_before_x1 > 0:
                     if xpath[0] not in compiler.ordering[module]:
                         compiler.ordering[module][xpath[0]] = []
