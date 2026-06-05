@@ -886,7 +886,7 @@ class CompilerContext(Context):
                         continue
                     substmt.i_annotate_node = annotated_module
                     for annotating_substmt in substmt.substmts:
-                        if isinstance(substmt.raw_keyword, tuple):
+                        if isinstance(annotating_substmt.raw_keyword, tuple):
                             prefix, identifier = annotating_substmt.raw_keyword
                             m, rev = util.prefix_to_modulename_and_revision(
                                 annotating_substmt.i_module,
