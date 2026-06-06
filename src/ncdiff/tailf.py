@@ -503,12 +503,12 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                     constraints.append((
                         xpath[0], oper_0, xpath[1], oper_1, xpath_stmt))
                     update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
-                    x0_before_x1 += DEPENDENCY_TYPE[(oper_0, oper_1)]
+                    x0_before_x1 |= DEPENDENCY_TYPE[(oper_0, oper_1)]
                 else:
                     constraints.append((
                         xpath[1], oper_1, xpath[0], oper_0, xpath_stmt))
                     update_schema_tree(stmt[1], oper_1, stmt[0], oper_0)
-                    x1_before_x0 += DEPENDENCY_TYPE[(oper_1, oper_0)]
+                    x1_before_x0 |= DEPENDENCY_TYPE[(oper_1, oper_0)]
 
             if hasattr(compiler, "ordering") and module in compiler.ordering:
 
