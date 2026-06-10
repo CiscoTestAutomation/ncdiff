@@ -1632,6 +1632,25 @@ class ModelCompiler(object):
                 target_stmt is not None and
                 self.require_instance(leaf_statement) is True
             ):
+
+                # For TailF ordering annotation statements put in a grouping,
+                # pyang creates a new Statement object each time when the
+                # grouping is used. It is appropriate to use the Statement
+                # object to store the raw_ordering_match and the ordering_match
+                # list, as the Statement object is unique for each grouping
+                # instance.
+                # However, for leafref path statements in a grouping, pyang
+                # does not create a new Statement object for each use of the
+                # grouping. Therefore, it is not appropriate to store the
+                # raw_ordering_match and the ordering_match list in the
+                # Statement object of the path statement, as it may cause
+                # conflicts when the same path statement is used in each
+                # grouping instance. Instead, we can store the
+                # raw_ordering_match and the ordering_match list in the
+                # Statement object of the leaf or leaf-list node that is type
+                # leafref. This way, we can avoid conflicts and ensure that the
+                # ordering information is correctly associated with each
+                # leaf or leaf-list node that is type leafref.
                 self.ordering_stmt_leafref[module].append((
                     leaf_statement,
                     target_stmt,
@@ -1643,18 +1662,18 @@ class ModelCompiler(object):
                         ('modify', 'before', 'delete'),
                         ('delete', 'before', 'delete'),
                     ],
-                    path_statement,
+                    leaf_statement,
                 ))
 
                 for attr in ['raw_ordering_match', 'ordering_match']:
-                    if not hasattr(path_statement, attr):
-                        setattr(path_statement, attr, [])
+                    if not hasattr(leaf_statement, attr):
+                        setattr(leaf_statement, attr, [])
                 item = (target_stmt, "=", leaf_statement)
-                if item not in path_statement.raw_ordering_match:
-                    path_statement.raw_ordering_match.append(item)
+                if item not in leaf_statement.raw_ordering_match:
+                    leaf_statement.raw_ordering_match.append(item)
                 item = (target_stmt, "=", leaf_statement, None)
-                if item not in path_statement.ordering_match:
-                    path_statement.ordering_match.append(item)
+                if item not in leaf_statement.ordering_match:
+                    leaf_statement.ordering_match.append(item)
 
     def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
         sm = leaf_statement.search_one('type')

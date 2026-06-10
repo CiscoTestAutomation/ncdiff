@@ -319,10 +319,15 @@ class TestNative(unittest.TestCase):
         target = self.compiler.context.check_data_tree_xpath(
             path_stmt, leafref)
 
+        # Because this is ordering_stmt_leafref, xpath_stmt should be
+        # leafref_stmt. Please refer to comments in set_ordering_stmt_leafref()
+        # in model.py for details.
+        self.assertIs(xpath_stmt, leafref_stmt)
+
         self.assertIs(leafref, leafref_stmt)
         self.assertIs(target, target_stmt)
         self.assertIsInstance(ordering, list)
-        self.assertIn('Cisco-IOS-XE-parser.yang:161', str(xpath_stmt.pos))
+        self.assertIn('Cisco-IOS-XE-parser.yang:161', str(path_stmt.pos))
 
     def test_ordering_stmt_tailf(self):
         self.assertIn('Cisco-IOS-XE-native', self.compiler.ordering_stmt_tailf)

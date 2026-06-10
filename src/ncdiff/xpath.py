@@ -23,6 +23,7 @@ def set_ordering_match(ctx, xpath_stmt, initial, node1, node2, operator):
         if match_item not in xpath_stmt.ordering_match:
             xpath_stmt.ordering_match.append(match_item)
 
+
 def get_function(tuple_info, xpath_stmt):
     """tuple_info is a tuple of the form (type, inputs). For example,
     ('number', [('object', ('substring-before', [('string', <pyang.LeafLeaflistStatement 'leaf name' at 0x7fe47ff10b80>), ('string', '.')]))])"""
@@ -35,8 +36,9 @@ def get_function(tuple_info, xpath_stmt):
                          f"{len(args)}:\n{xpath_stmt.pos}")
             return None
         if args[1] != ('string', '.'):
-            logger.warning(f"{func}() should have the 2nd argument as '.' but "
-                           f"actually has {args[1]}:\n{xpath_stmt.pos}")
+            logger.error(f"{func}() should have the 2nd argument as '.' but "
+                         f"actually '{args[1]}'. This requires an enhancement "
+                         f"of ncdiff:\n{xpath_stmt.pos}")
             return None
         return (args[0][1], func)
     elif func == 'string':
@@ -55,6 +57,7 @@ def get_function(tuple_info, xpath_stmt):
         logger.warning(f"{func}() is not supported by the value matching "
                        f"feature\n{xpath_stmt.pos}")
         return None
+
 
 def chk_xpath_expr(ctx, xpath_stmt, initial, node, q, t):
     mod = xpath_stmt.i_orig_module

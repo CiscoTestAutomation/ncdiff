@@ -489,7 +489,7 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                 ):
                     continue
 
-            ordering_match = set_ordering_match(compiler, module, xpath_stmt)
+            ordering_match = get_ordering_match(compiler, module, xpath_stmt)
             x0_before_x1 = 0
             x1_before_x0 = 0
 
@@ -543,9 +543,7 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
     getattr(compiler, attribute_name)[module] = constraints
 
 
-
-
-def set_ordering_match(compiler, module, xpath_stmt):
+def get_ordering_match(compiler, module, xpath_stmt):
     if (
         not hasattr(xpath_stmt, 'ordering_match') or
         module not in compiler.ordering_match
@@ -567,9 +565,6 @@ def set_ordering_match(compiler, module, xpath_stmt):
                 get_xpath(compiler, node_1),
                 function,
             )
-
-        if get_xpath(compiler, node_1) == '':
-            compiler.xpath_stmt = xpath_stmt
 
         if item not in compiler.ordering_match[module]:
             compiler.ordering_match[module].append(item)
