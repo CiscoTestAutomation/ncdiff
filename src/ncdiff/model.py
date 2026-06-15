@@ -1628,10 +1628,15 @@ class ModelCompiler(object):
         if not self.skip(leaf_statement, leaf_node):
             target_stmt = self.context.check_data_tree_xpath(
                 path_statement, leaf_statement)
-            if (
-                target_stmt is not None and
-                self.require_instance(leaf_statement) is True
-            ):
+
+            # A leafref with require-instance false means the instance being
+            # referred to may not exist in the data tree. In such cases, if
+            # the instance does exist, it is still appropriate to treat the
+            # leafref as a dependency for ordering purpose. Therefore, we do
+            # not need to check the require-instance substatement of the
+            # leafref type statement, and always treat the leafref as a
+            # dependency for ordering purpose when the instance is there.
+            if target_stmt is not None:
 
                 # For TailF ordering annotation statements put in a grouping,
                 # pyang creates a new Statement object each time when the
