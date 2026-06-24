@@ -1542,14 +1542,14 @@ class ModelCompiler(object):
                     len(ch.keyword) == 2
                 ):
                     if ch.keyword[1] == 'non-strict-leafref':
-                        # Do not treat non-strict-leafref as a leafref for now
-                        # as it is not clear how this may impact the CLI
-                        # ordering.
-                        # p = ch.search_one('path')
-                        # if p is not None:
-                        #     self.set_ordering_stmt_leafref(
-                        #         module.arg, child, p, n)
-                        pass
+                        # Treat tailf:non-strict-leafref as a leafref for now
+                        # for CLI ordering purpose. It allows reference to
+                        # non-existing leafs, but we are going to enforce the
+                        # ordering if instances exist.
+                        p = ch.search_one('path')
+                        if p is not None:
+                            self.set_ordering_stmt_leafref(
+                                module.arg, child, p, n)
                     elif is_tailf_ordering(ch):
                         target = self.context.check_data_tree_xpath(
                             ch, child)
