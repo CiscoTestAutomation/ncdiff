@@ -267,11 +267,11 @@ class ModelDevice(manager.Manager):
             <Element modules at 0x7fbc044b6600>
             >>>
         '''
-
         if download in ['check', 'force']:
             d = ModelDownloader(self, folder)
             d.download_all(check_before_download=(download == 'check'))
-        self.compiler = ModelCompiler(folder)
+        if self.compiler is None:
+            self.compiler = ModelCompiler(folder)
 
     def load_model(self, model):
         '''load_model
