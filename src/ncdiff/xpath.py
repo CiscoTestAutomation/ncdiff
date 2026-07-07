@@ -340,4 +340,11 @@ def chk_xpath_path(ctx, xpath_stmt, initial, node, path):
         for p in preds:
             # pyang.xpath.chk_xpath_expr(ctx, mod, pos, initial, node1, p, None)
             chk_xpath_expr(ctx, xpath_stmt, initial, node1, p, None)
+
+        # Mark attribute xpath_expr_invalid of xpath_stmt if the Xpath
+        # expression in the statement cannot be resolved. This is used to
+        # determine whether the when or path statement is considered valid.
+        if not hasattr(xpath_stmt, 'xpath_expr_invalid') and node1 is None:
+            xpath_stmt.xpath_expr_invalid = True
+
         return chk_xpath_path(ctx, xpath_stmt, initial, node1, path[1:])
