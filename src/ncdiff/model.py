@@ -1565,9 +1565,9 @@ class ModelCompiler(object):
                     else:
                         add_tailf_annotation(self.module_namespaces, ch, n)
                 else:
-                    logger.warning("Unknown Tailf annotation at {}, "
-                                   "keyword = {}"
-                                   .format(ch.pos, ch.keyword))
+                    logger.warning("Unknown module {} for Tailf annotation "
+                                   "keyword {} at {}"
+                                   .format(ch.keyword[0], ch.keyword, ch.pos))
 
         featurenames = [f.arg for f in child.search('if-feature')]
         if hasattr(child, 'i_augment'):
