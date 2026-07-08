@@ -344,7 +344,10 @@ def chk_xpath_path(ctx, xpath_stmt, initial, node, path):
         # Mark attribute xpath_expr_invalid of xpath_stmt if the Xpath
         # expression in the statement cannot be resolved. This is used to
         # determine whether the when or path statement is considered valid.
-        if not hasattr(xpath_stmt, 'xpath_expr_invalid') and node1 is None:
+        if (
+            node1 is None and
+            getattr(xpath_stmt, 'xpath_expr_invalid', None) is None
+        ):
             xpath_stmt.xpath_expr_invalid = True
 
         return chk_xpath_path(ctx, xpath_stmt, initial, node1, path[1:])
