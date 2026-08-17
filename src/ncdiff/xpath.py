@@ -24,6 +24,23 @@ def set_ordering_match(ctx, xpath_stmt, initial, node1, node2, operator):
             xpath_stmt.ordering_match.append(match_item)
 
 
+def get_context_node(stmt):
+    if stmt.parent.keyword == 'augment':
+        node = stmt.parent.i_target_node
+    elif stmt.parent.keyword == 'deviate':
+        node = stmt.parent.parent.i_target_node
+    elif (
+        getattr(stmt, 'i_origin', None) == 'uses' and
+        stmt.parent.keyword != 'choice'
+    ):
+        node = pyang.util.data_node_up(stmt.parent)
+    else:
+        node = stmt.parent
+    if node is not None:
+        node = pyang.util.closest_ancestor_data_node(node)
+    return node
+
+
 def get_function(tuple_info, xpath_stmt):
     """tuple_info is a tuple of the form (type, inputs). For example,
     ('number', [('object', ('substring-before', [('string', <pyang.LeafLeaflistStatement 'leaf name' at 0x7fe47ff10b80>), ('string', '.')]))])"""
@@ -132,6 +149,10 @@ def chk_xpath_expr(ctx, xpath_stmt, initial, node, q, t):
                                 pyang.error.err_add(ctx.errors, pos0,
                                         'WPREFIX_NOT_DEFINED', arg)
             return s
+        elif q[0] == 'string':
+            return q[1]
+        elif q[0] == 'number':
+            return q[1]
 
 
 def chk_xpath_function(ctx, xpath_stmt, initial, node, func, args):
@@ -251,7 +272,6 @@ def chk_xpath_path(ctx, xpath_stmt, initial, node, path):
                     pmodule = initial.i_module
             else:
                 pmodule = pyang.util.prefix_to_module(mod, prefix, pos, ctx.errors)
-                # pmodule = prefix_to_module(mod, prefix, pos, ctx.errors)
             # if node and initial are None, it means we're checking an XPath
             # expression when it is defined in a grouping or augment, i.e.,
             # when the full tree is not expanded.  in this case we can't check
@@ -338,16 +358,6 @@ def chk_xpath_path(ctx, xpath_stmt, initial, node, path):
             # validate functions etc.
             pass
         for p in preds:
-            # pyang.xpath.chk_xpath_expr(ctx, mod, pos, initial, node1, p, None)
             chk_xpath_expr(ctx, xpath_stmt, initial, node1, p, None)
-
-        # Mark attribute xpath_expr_invalid of xpath_stmt if the Xpath
-        # expression in the statement cannot be resolved. This is used to
-        # determine whether the when or path statement is considered valid.
-        if (
-            node1 is None and
-            getattr(xpath_stmt, 'xpath_expr_invalid', None) is None
-        ):
-            xpath_stmt.xpath_expr_invalid = True
 
         return chk_xpath_path(ctx, xpath_stmt, initial, node1, path[1:])
