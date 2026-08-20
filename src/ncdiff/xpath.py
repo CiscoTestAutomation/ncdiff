@@ -93,9 +93,22 @@ def chk_xpath_expr(ctx, xpath_stmt, initial, node, q, t):
                 for qa in q[1]
             ]
         elif q[0] == 'comp':
+            # The comparison may involve chk_xpath_path function, which may
+            # interfere attribute skip_instance_match. So we need to save the
+            # original value of skip_instance_match before comparison and
+            # restore it after comparison.
+            skip_instance_match = getattr(xpath_stmt, 'skip_instance_match', None)
+
             node1 = chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
             node2 = chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
             set_ordering_match(ctx, xpath_stmt, initial, node1, node2, q[1])
+
+            # Restore the original value of skip_instance_match after comparison
+            if skip_instance_match is None:
+                if hasattr(xpath_stmt, 'skip_instance_match'):
+                    delattr(xpath_stmt, 'skip_instance_match')
+            else:
+                xpath_stmt.skip_instance_match = skip_instance_match
         elif q[0] == 'arith':
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
@@ -349,6 +362,17 @@ def chk_xpath_path(ctx, xpath_stmt, initial, node, path):
                 pyang.error.err_add(ctx.errors, pos, 'XPATH_PATH_TOO_MANY_UP', ())
             else:
                 p = pyang.util.data_node_up(node)
+
+                # If node is a list and p is not None, it means that the node
+                # is a list and we are trying to go up to its parent. In this
+                # case, we should indicate that the initial node and the target
+                # are no longer required to stay in the same instance of list
+                # node by appending node to attribute skip_instance_match.
+                if node.keyword == "list" and p is not None:
+                    if not hasattr(xpath_stmt, 'skip_instance_match'):
+                        xpath_stmt.skip_instance_match = []
+                    xpath_stmt.skip_instance_match.append(node)
+
                 if p is None:
                     pyang.error.err_add(ctx.errors, pos, 'XPATH_PATH_TOO_MANY_UP', ())
                 else:

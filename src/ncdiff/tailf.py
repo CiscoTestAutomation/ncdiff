@@ -43,8 +43,9 @@ def is_deprecated_without_replacement(stmt):
     return False
 
 
-def get_tailf_ordering(context, stmt, target_stmt):
-    symmetric = is_symmetric_tailf_ordering(context, stmt, target_stmt)
+def get_tailf_ordering(context, stmt, node_stmt, target_stmt):
+    symmetric = is_symmetric_tailf_ordering(
+        context, stmt, node_stmt, target_stmt)
     if stmt.keyword[1] in ['cli-diff-after', 'cli-diff-before']:
         conj = 'after' if stmt.keyword[1] == 'cli-diff-after' else 'before'
         valid_substmts = {
@@ -490,6 +491,7 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                     continue
 
             ordering_match = get_ordering_match(compiler, module, xpath_stmt)
+            skip_instance_match = get_skip_instance_match(compiler, xpath_stmt)
             x0_before_x1 = 0
             x1_before_x0 = 0
 
@@ -528,13 +530,15 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                     if xpath[0] not in compiler.ordering[module]:
                         compiler.ordering[module][xpath[0]] = []
                     compiler.ordering[module][xpath[0]].append(
-                        (xpath[1], f"{x0_before_x1:03x}", ordering_match, "1")
+                        (xpath[1], f"{x0_before_x1:03x}", ordering_match, "1",
+                         skip_instance_match)
                     )
                 if x1_before_x0 > 0:
                     if xpath[1] not in compiler.ordering[module]:
                         compiler.ordering[module][xpath[1]] = []
                     compiler.ordering[module][xpath[1]].append(
-                        (xpath[0], f"{x1_before_x0:03x}", ordering_match, "0")
+                        (xpath[0], f"{x1_before_x0:03x}", ordering_match, "0",
+                         skip_instance_match)
                     )
 
     attribute_name = "ordering_xpath_leafref" \
@@ -572,6 +576,20 @@ def get_ordering_match(compiler, module, xpath_stmt):
     return " ".join(map(str, match_table_indexes))
 
 
+def get_skip_instance_match(compiler, xpath_stmt):
+    if (
+        not hasattr(xpath_stmt, 'skip_instance_match') or
+        len(xpath_stmt.skip_instance_match) == 0
+    ):
+        return None
+    skip_instance_match = []
+    for stmt in xpath_stmt.skip_instance_match:
+        xpath = get_xpath(compiler, stmt)
+        if len(xpath) > 0:
+            skip_instance_match.append(xpath)
+    return skip_instance_match if len(skip_instance_match) > 0 else None
+
+
 def update_schema_tree(stmt_0, oper_0, stmt_1, oper_1):
     schema_node_1 = getattr(stmt_0, 'schema_node', None)
     if schema_node_1 is None:
@@ -599,19 +617,25 @@ def update_schema_tree(stmt_0, oper_0, stmt_1, oper_1):
         schema_node_1.set("before", repr(ordering))
 
 
-def is_symmetric_tailf_ordering(context, stmt, target_stmt):
-    if len(stmt.substmts) != 0:
+def is_symmetric_tailf_ordering(context, xpath_stmt, node_stmt, target_stmt):
+    # It must be symmetric if the node_stmt and target_stmt are the same, because
+    # the ordering is applied to the same node, and the ordering should be
+    # symmetric in this case.
+    if node_stmt is target_stmt:
+        return True
+
+    if len(xpath_stmt.substmts) > 0:
         return False
     substmts = {
         s for s in target_stmt.substmts
         if isinstance(s.keyword, tuple) and
         'tailf' in s.keyword[0] and
         len(s.substmts) == 0 and
-        s.keyword[1] == stmt.keyword[1]
+        s.keyword[1] == xpath_stmt.keyword[1]
     }
     for substmt in substmts:
         target = context.check_data_tree_xpath(
             substmt, target_stmt)
-        if target == stmt.parent:
+        if target == xpath_stmt.parent:
             return True
     return False

@@ -714,6 +714,12 @@ class CompilerContext(Context):
                            "attribute 'i_orig_module'")
             return None
 
+        # At the entrance of chk_xpath_path, reset the skip_instance_match
+        # attribute of xpath_stmt to empty list, so that the skip_instance_match
+        # attribute does not carry over from previous calls.
+        if hasattr(xpath_stmt, 'skip_instance_match'):
+            xpath_stmt.skip_instance_match = []
+
         p = xpath_parser.parse(xpath_stmt.arg)
         if isinstance(p, list):
             node = chk_xpath_path(
@@ -1555,7 +1561,7 @@ class ModelCompiler(object):
                             ch, child)
                         if target is not None:
                             ordering = get_tailf_ordering(
-                                self.context, ch, target)
+                                self.context, ch, child, target)
                             self.ordering_stmt_tailf[module.arg].append((
                                 child,
                                 target,
