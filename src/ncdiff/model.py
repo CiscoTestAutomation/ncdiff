@@ -708,7 +708,7 @@ class CompilerContext(Context):
         )
         self.dependencies = read_xml(dependencies_file)
 
-    def check_data_tree_xpath(self, xpath_stmt, node_stmt):
+    def check_data_tree_xpath(self, xpath_stmt, node_stmt, attr_stmt):
         if not hasattr(xpath_stmt, 'i_orig_module'):
             logger.warning(f"Statement at {xpath_stmt.pos} does not have "
                            "attribute 'i_orig_module'")
@@ -717,14 +717,16 @@ class CompilerContext(Context):
         # At the entrance of chk_xpath_path, reset the skip_instance_match
         # attribute of xpath_stmt to empty list, so that the skip_instance_match
         # attribute does not carry over from previous calls.
-        if hasattr(xpath_stmt, 'skip_instance_match'):
-            xpath_stmt.skip_instance_match = []
+        if hasattr(attr_stmt, 'skip_instance_match'):
+            attr_stmt.skip_instance_match = []
+        if hasattr(attr_stmt, 'instance_match'):
+            attr_stmt.instance_match = []
 
         p = xpath_parser.parse(xpath_stmt.arg)
         if isinstance(p, list):
             node = chk_xpath_path(
                 self,
-                xpath_stmt,
+                attr_stmt,
                 node_stmt,
                 node_stmt,
                 p,
@@ -733,7 +735,7 @@ class CompilerContext(Context):
             if p[0] == 'absolute':
                 node = chk_xpath_path(
                     self,
-                    xpath_stmt,
+                    attr_stmt,
                     node_stmt,
                     'root',
                     p[1],
@@ -741,7 +743,7 @@ class CompilerContext(Context):
             elif p[0] == 'relative':
                 node = chk_xpath_path(
                     self,
-                    xpath_stmt,
+                    attr_stmt,
                     node_stmt,
                     node_stmt,
                     p[1],
@@ -1267,7 +1269,6 @@ class ModelCompiler(object):
         self.ordering_stmt_tailf = {}
         self.ordering_xpath_leafref = {}
         self.ordering_xpath_tailf = {}
-        self.ordering_match = {}
         self.ordering = {}
         self._dependencies = {}
 
@@ -1462,7 +1463,6 @@ class ModelCompiler(object):
 
         self.ordering_stmt_leafref[module] = []
         self.ordering_stmt_tailf[module] = []
-        self.ordering_match[module] = []
         self.ordering[module] = {}
 
         for child in vm.i_children:
@@ -1556,9 +1556,16 @@ class ModelCompiler(object):
                         if p is not None:
                             self.set_ordering_stmt_leafref(
                                 module.arg, child, p, n)
+                            n.set(
+                                etree.QName(
+                                    self.module_namespaces[ch.keyword[0]],
+                                    ch.keyword[1],
+                                ),
+                                ch.arg if ch.arg else '',
+                            )
                     elif is_tailf_ordering(ch):
                         target = self.context.check_data_tree_xpath(
-                            ch, child)
+                            ch, child, ch)
                         if target is not None:
                             ordering = get_tailf_ordering(
                                 self.context, ch, child, target)
@@ -1633,7 +1640,7 @@ class ModelCompiler(object):
         # Consider leafref as a dpendency for ordering purpose
         if not self.skip(leaf_statement, leaf_node):
             target_stmt = self.context.check_data_tree_xpath(
-                path_statement, leaf_statement)
+                path_statement, leaf_statement, leaf_statement)
 
             # A leafref with require-instance false means the instance being
             # referred to may not exist in the data tree. In such cases, if
@@ -1647,21 +1654,19 @@ class ModelCompiler(object):
                 # For TailF ordering annotation statements put in a grouping,
                 # pyang creates a new Statement object each time when the
                 # grouping is used. It is appropriate to use the Statement
-                # object to store the raw_ordering_match and the ordering_match
-                # list, as the Statement object is unique for each grouping
-                # instance.
+                # object to store the instance_match list, as the Statement
+                # object is unique for each grouping instance.
                 # However, for leafref path statements in a grouping, pyang
                 # does not create a new Statement object for each use of the
                 # grouping. Therefore, it is not appropriate to store the
-                # raw_ordering_match and the ordering_match list in the
-                # Statement object of the path statement, as it may cause
-                # conflicts when the same path statement is used in each
-                # grouping instance. Instead, we can store the
-                # raw_ordering_match and the ordering_match list in the
-                # Statement object of the leaf or leaf-list node that is type
-                # leafref. This way, we can avoid conflicts and ensure that the
-                # ordering information is correctly associated with each
-                # leaf or leaf-list node that is type leafref.
+                # instance_match list in the Statement object of the path
+                # statement, as it may cause conflicts when the same path
+                # statement is used in each grouping instance. Instead, we can
+                # store the instance_match list in the Statement object of the
+                # leaf or leaf-list node that is type leafref. This way, we can
+                # avoid conflicts and ensure that the ordering information is
+                # correctly associated with each leaf or leaf-list node that is
+                # type leafref.
                 self.ordering_stmt_leafref[module].append((
                     leaf_statement,
                     target_stmt,
@@ -1676,15 +1681,18 @@ class ModelCompiler(object):
                     leaf_statement,
                 ))
 
-                for attr in ['raw_ordering_match', 'ordering_match']:
-                    if not hasattr(leaf_statement, attr):
-                        setattr(leaf_statement, attr, [])
-                item = (target_stmt, "=", leaf_statement)
-                if item not in leaf_statement.raw_ordering_match:
-                    leaf_statement.raw_ordering_match.append(item)
-                item = (target_stmt, "=", leaf_statement, None)
-                if item not in leaf_statement.ordering_match:
-                    leaf_statement.ordering_match.append(item)
+                if not hasattr(leaf_statement, 'instance_match'):
+                    setattr(leaf_statement, 'instance_match', [])
+                p = xpath_parser.parse(path_statement.arg)
+                p = (
+                        'comp',
+                        '=',
+                        ('path_expr', ('function_call', 'current', [])),
+                        p,
+                    )
+                leaf_statement.instance_match.append((
+                    leaf_statement, leaf_statement, leaf_statement, p))
+
 
     def set_leaf_datatype_value(self, module, leaf_statement, leaf_node):
         sm = leaf_statement.search_one('type')

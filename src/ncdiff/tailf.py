@@ -490,7 +490,8 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
                 ):
                     continue
 
-            ordering_match = get_ordering_match(compiler, module, xpath_stmt)
+            ordering_match = xpath_stmt.instance_match \
+                if hasattr(xpath_stmt, 'instance_match') else None
             skip_instance_match = get_skip_instance_match(compiler, xpath_stmt)
             x0_before_x1 = 0
             x1_before_x0 = 0
@@ -545,35 +546,6 @@ def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
         if constraint_type == "ordering_stmt_leafref" \
         else "ordering_xpath_tailf"
     getattr(compiler, attribute_name)[module] = constraints
-
-
-def get_ordering_match(compiler, module, xpath_stmt):
-    if (
-        not hasattr(xpath_stmt, 'ordering_match') or
-        module not in compiler.ordering_match
-    ):
-        return None
-    match_table_indexes = []
-    for node_0, operator, node_1, function in xpath_stmt.ordering_match:
-        if isinstance(node_1, str):
-            item = (
-                get_xpath(compiler, node_0),
-                operator,
-                node_1,
-                function,
-            )
-        else:
-            item = (
-                get_xpath(compiler, node_0),
-                operator,
-                get_xpath(compiler, node_1),
-                function,
-            )
-
-        if item not in compiler.ordering_match[module]:
-            compiler.ordering_match[module].append(item)
-        match_table_indexes.append(compiler.ordering_match[module].index(item))
-    return " ".join(map(str, match_table_indexes))
 
 
 def get_skip_instance_match(compiler, xpath_stmt):
@@ -635,7 +607,7 @@ def is_symmetric_tailf_ordering(context, xpath_stmt, node_stmt, target_stmt):
     }
     for substmt in substmts:
         target = context.check_data_tree_xpath(
-            substmt, target_stmt)
+            substmt, target_stmt, substmt)
         if target == xpath_stmt.parent:
             return True
     return False

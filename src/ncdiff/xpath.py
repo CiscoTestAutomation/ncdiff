@@ -5,25 +5,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def set_ordering_match(ctx, xpath_stmt, initial, node1, node2, operator):
-    if not hasattr(xpath_stmt, 'raw_ordering_match'):
-        xpath_stmt.raw_ordering_match = []
-    match_item = (node1, operator, node2)
-    if match_item not in xpath_stmt.raw_ordering_match:
-        xpath_stmt.raw_ordering_match.append(match_item)
-
-    n2 = get_function(node2, xpath_stmt)
-    if n2 is not None:
-        if not hasattr(xpath_stmt, 'ordering_match'):
-            xpath_stmt.ordering_match = []
-        if isinstance(n2, tuple):
-            match_item = (node1, operator) + n2
-        else:
-            match_item = (node1, operator, n2, None)
-        if match_item not in xpath_stmt.ordering_match:
-            xpath_stmt.ordering_match.append(match_item)
-
-
 def get_context_node(stmt):
     if stmt.parent.keyword == 'augment':
         node = stmt.parent.i_target_node
@@ -97,14 +78,25 @@ def chk_xpath_expr(ctx, xpath_stmt, initial, node, q, t):
             # interfere attribute skip_instance_match. So we need to save the
             # original value of skip_instance_match before comparison and
             # restore it after comparison.
-            skip_instance_match = getattr(xpath_stmt, 'skip_instance_match', None)
+            missing = object()
+            skip_instance_match = getattr(
+                xpath_stmt, 'skip_instance_match', missing)
 
-            node1 = chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
-            node2 = chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
-            set_ordering_match(ctx, xpath_stmt, initial, node1, node2, q[1])
+            instance_match_open = hasattr(xpath_stmt, 'instance_match_open')
+            if not instance_match_open:
+                xpath_stmt.instance_match_open = None
+                if not hasattr(xpath_stmt, 'instance_match'):
+                    xpath_stmt.instance_match = []
+                xpath_stmt.instance_match.append((xpath_stmt, initial, node, q))
+
+            chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
+            chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
+
+            if not instance_match_open:
+                delattr(xpath_stmt, 'instance_match_open')
 
             # Restore the original value of skip_instance_match after comparison
-            if skip_instance_match is None:
+            if skip_instance_match is missing:
                 if hasattr(xpath_stmt, 'skip_instance_match'):
                     delattr(xpath_stmt, 'skip_instance_match')
             else:
@@ -113,8 +105,19 @@ def chk_xpath_expr(ctx, xpath_stmt, initial, node, q, t):
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
         elif q[0] == 'bool':
+            instance_match_open = hasattr(xpath_stmt, 'instance_match_open')
+            if not instance_match_open:
+                xpath_stmt.instance_match_open = None
+                if not hasattr(xpath_stmt, 'instance_match'):
+                    xpath_stmt.instance_match = []
+                xpath_stmt.instance_match.append((xpath_stmt, initial, node, q))
+
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[2], None)
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[3], None)
+
+            if not instance_match_open:
+                delattr(xpath_stmt, 'instance_match_open')
+
         elif q[0] == 'negative':
             chk_xpath_expr(ctx, xpath_stmt, initial, node, q[1], None)
         elif q[0] == 'function_call':
