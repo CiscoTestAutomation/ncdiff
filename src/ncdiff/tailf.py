@@ -1,0 +1,613 @@
+import logging
+from os import path
+from lxml import etree
+from pyang import util, statements
+
+from .composer import Tag
+
+logger = logging.getLogger(__name__)
+
+
+DEPENDENCY_TYPE = {
+    ("create", "create"): 1,
+    ("create", "delete"): 2,
+    ("create", "modify"): 4,
+    ("delete", "create"): 8,
+    ("delete", "delete"): 16,
+    ("delete", "modify"): 32,
+    ("modify", "create"): 64,
+    ("modify", "delete"): 128,
+    ("modify", "modify"): 256,
+}
+
+
+def is_tailf_ordering(stmt):
+    if isinstance(stmt.keyword, tuple):
+        m, identifier = stmt.keyword
+        return m == 'tailf-common' and identifier in {
+            'cli-diff-after', 'cli-diff-before',
+            'cli-diff-create-after', 'cli-diff-create-before',
+            'cli-diff-delete-after', 'cli-diff-delete-before',
+            'cli-diff-modify-after', 'cli-diff-modify-before',
+            'cli-diff-set-after', 'cli-diff-set-before',
+            'cli-diff-dependency',
+        }
+    else:
+        return False
+
+
+def is_deprecated_without_replacement(stmt):
+    for substmt in stmt.search(('Cisco-IOS-XE-types', 'yang-meta-data')):
+        if substmt.arg == 'deprecated-without-replacement':
+            return True
+    return False
+
+
+def get_tailf_ordering(context, stmt, node_stmt, target_stmt):
+    symmetric = is_symmetric_tailf_ordering(
+        context, stmt, node_stmt, target_stmt)
+    if stmt.keyword[1] in ['cli-diff-after', 'cli-diff-before']:
+        conj = 'after' if stmt.keyword[1] == 'cli-diff-after' else 'before'
+        valid_substmts = {
+            'cli-when-target-set',
+            'cli-when-target-create',
+            'cli-when-target-modify',
+            'cli-when-target-delete',
+        }
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        if len(substmts) == 0:
+            return [
+                ('create', conj, 'create'),
+                ('modify', conj, 'create'),
+                ('delete', conj, 'create'),
+                ('create', conj, 'modify'),
+                ('modify', conj, 'modify'),
+                ('delete', conj, 'modify'),
+                ('create', conj, 'delete'),
+                ('modify', conj, 'delete'),
+                ('delete', conj, 'delete'),
+            ]
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-when-target-set':
+                ordering.extend([
+                    ('create', conj, 'create'),
+                    ('modify', conj, 'create'),
+                    ('delete', conj, 'create'),
+                    ('create', conj, 'modify'),
+                    ('modify', conj, 'modify'),
+                    ('delete', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-create':
+                ordering.extend([
+                    ('create', conj, 'create'),
+                    ('modify', conj, 'create'),
+                    ('delete', conj, 'create'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-modify':
+                ordering.extend([
+                    ('create', conj, 'modify'),
+                    ('modify', conj, 'modify'),
+                    ('delete', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-delete':
+                ordering.extend([
+                    ('create', conj, 'delete'),
+                    ('modify', conj, 'delete'),
+                    ('delete', conj, 'delete'),
+                ])
+        return ordering
+    elif stmt.keyword[1] in ['cli-diff-create-after', 'cli-diff-create-before']:
+        conj = 'after' if stmt.keyword[1] == 'cli-diff-create-after' else 'before'
+        valid_substmts = [
+            'cli-when-target-set',
+            'cli-when-target-create',
+            'cli-when-target-modify',
+            'cli-when-target-delete',
+        ]
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        if len(substmts) == 0:
+            if symmetric:
+                return [
+                    ('create', conj, 'modify'),
+                    ('create', conj, 'delete'),
+                ]
+            else:
+                return [
+                    ('create', conj, 'create'),
+                    ('create', conj, 'modify'),
+                    ('create', conj, 'delete'),
+                ]
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-when-target-set':
+                ordering.extend([
+                    ('create', conj, 'create'),
+                    ('create', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-create':
+                ordering.append(
+                    ('create', conj, 'create'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-modify':
+                ordering.append(
+                    ('create', conj, 'modify'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-delete':
+                ordering.append(
+                    ('create', conj, 'delete'),
+                )
+        return ordering
+    elif stmt.keyword[1] in ['cli-diff-delete-after', 'cli-diff-delete-before']:
+        conj = 'after' if stmt.keyword[1] == 'cli-diff-delete-after' else 'before'
+        valid_substmts = {
+            'cli-when-target-set',
+            'cli-when-target-create',
+            'cli-when-target-modify',
+            'cli-when-target-delete',
+        }
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        if len(substmts) == 0:
+            if symmetric:
+                return [
+                    ('delete', conj, 'create'),
+                    ('delete', conj, 'modify'),
+                ]
+            else:
+                return [
+                    ('delete', conj, 'create'),
+                    ('delete', conj, 'modify'),
+                    ('delete', conj, 'delete'),
+                ]
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-when-target-set':
+                ordering.extend([
+                    ('delete', conj, 'create'),
+                    ('delete', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-create':
+                ordering.append(
+                    ('delete', conj, 'create'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-modify':
+                ordering.append(
+                    ('delete', conj, 'modify'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-delete':
+                ordering.append(
+                    ('delete', conj, 'delete'),
+                )
+        return ordering
+    elif stmt.keyword[1] in ['cli-diff-modify-after', 'cli-diff-modify-before']:
+        conj = 'after' if stmt.keyword[1] == 'cli-diff-modify-after' else 'before'
+        valid_substmts = {
+            'cli-when-target-set',
+            'cli-when-target-create',
+            'cli-when-target-modify',
+            'cli-when-target-delete',
+        }
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        if len(substmts) == 0:
+            return [
+                ('modify', conj, 'create'),
+                ('modify', conj, 'modify'),
+                ('modify', conj, 'delete'),
+            ]
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-when-target-set':
+                ordering.extend([
+                    ('modify', conj, 'create'),
+                    ('modify', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-create':
+                ordering.append(
+                    ('modify', conj, 'create'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-modify':
+                ordering.append(
+                    ('modify', conj, 'modify'),
+                )
+            elif substmt.keyword[1] == 'cli-when-target-delete':
+                ordering.append(
+                    ('modify', conj, 'delete'),
+                )
+        return ordering
+    elif stmt.keyword[1] in ['cli-diff-set-after', 'cli-diff-set-before']:
+        conj = 'after' if stmt.keyword[1] == 'cli-diff-set-after' else 'before'
+        valid_substmts = {
+            'cli-when-target-set',
+            'cli-when-target-create',
+            'cli-when-target-modify',
+            'cli-when-target-delete',
+        }
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        if len(substmts) == 0:
+            return [
+                ('create', conj, 'create'),
+                ('modify', conj, 'create'),
+                ('create', conj, 'modify'),
+                ('modify', conj, 'modify'),
+                ('create', conj, 'delete'),
+                ('modify', conj, 'delete'),
+            ]
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-when-target-set':
+                ordering.extend([
+                    ('create', conj, 'create'),
+                    ('modify', conj, 'create'),
+                    ('create', conj, 'modify'),
+                    ('modify', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-create':
+                ordering.extend([
+                    ('create', conj, 'create'),
+                    ('modify', conj, 'create'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-modify':
+                ordering.extend([
+                    ('create', conj, 'modify'),
+                    ('modify', conj, 'modify'),
+                ])
+            elif substmt.keyword[1] == 'cli-when-target-delete':
+                ordering.extend([
+                    ('create', conj, 'delete'),
+                    ('modify', conj, 'delete'),
+                ])
+        return ordering
+    elif stmt.keyword[1] == 'cli-diff-dependency':
+        valid_substmts = {
+            'cli-trigger-on-set',
+            'cli-trigger-on-delete',
+            'cli-trigger-on-all',
+        }
+        substmts = [s for s in stmt.substmts if s.keyword[1] in valid_substmts]
+        # This is the ordering retrived from TailF confd test result:
+        ordering = [
+            ('create', 'after', 'create'),
+            ('modify', 'after', 'create'),
+            ('delete', 'before', 'modify'),
+            ('create', 'before', 'delete'),
+            ('modify', 'before', 'delete'),
+            ('delete', 'before', 'delete'),
+        ]
+        # Test result from TailF confd 8.4.7.1:
+        # 1 depends on 2
+        # ('create', 'after', 'create'),
+        # ('modify', 'after', 'create'),
+        # ('delete', 'before', 'create'),
+        # ('create', 'before', 'modify'),
+        # ('modify', 'before', 'modify'),
+        # ('delete', 'before', 'modify'),
+        # ('create', 'before', 'delete'),
+        # ('modify', 'before', 'delete'),
+        # ('delete', 'before', 'delete'),
+        # 2 depends on 1
+        # ('create', 'after', 'create'),
+        # ('modify', 'after', 'create'),
+        # ('delete', 'after', 'create'),
+        # ('create', 'after', 'modify'),
+        # ('modify', 'after', 'modify'),
+        # ('delete', 'before', 'modify'),
+        # ('create', 'before', 'delete'),
+        # ('modify', 'before', 'delete'),
+        # ('delete', 'before', 'delete'),
+        if len(substmts) == 0:
+            return ordering
+        ordering = []
+        for substmt in substmts:
+            if substmt.keyword[1] == 'cli-trigger-on-set':
+                ordering.extend([
+                    ('create', 'after', 'create'),
+                    ('modify', 'after', 'create'),
+                    ('create', 'after', 'modify'),
+                    ('modify', 'after', 'modify'),
+                ])
+                # Test result from TailF confd 8.4.7.1:
+                # 1 depends on 2
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'before', 'create'),
+                # ('create', 'after', 'modify'),
+                # ('modify', 'after', 'modify'),
+                # ('delete', 'before', 'modify'),
+                # ('create', 'after', 'delete'),
+                # ('modify', 'after', 'delete'),
+                # ('delete', 'before', 'delete'),
+                # 2 depends on 1
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'after', 'create'),
+                # ('create', 'after', 'modify'),
+                # ('modify', 'after', 'modify'),
+                # ('delete', 'after', 'modify'),
+                # ('create', 'after', 'delete'),
+                # ('modify', 'after', 'delete'),
+                # ('delete', 'after', 'delete'),
+            elif substmt.keyword[1] == 'cli-trigger-on-delete':
+                ordering.extend([
+                    ('create', 'after', 'create'),
+                    ('modify', 'after', 'create'),
+                    ('delete', 'before', 'modify'),
+                    ('delete', 'before', 'delete'),
+                ])
+                # Test result from TailF confd 8.4.7.1:
+                # 1 depends on 2
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'before', 'create'),
+                # ('create', 'before', 'modify'),
+                # ('modify', 'before', 'modify'),
+                # ('delete', 'before', 'modify'),
+                # ('create', 'before', 'delete'),
+                # ('modify', 'before', 'delete'),
+                # ('delete', 'before', 'delete'),
+                # 2 depends on 1
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'after', 'create'),
+                # ('create', 'after', 'modify'),
+                # ('modify', 'after', 'modify'),
+                # ('delete', 'before', 'modify'),
+                # ('create', 'before', 'delete'),
+                # ('modify', 'before', 'delete'),
+                # ('delete', 'before', 'delete'),
+            elif substmt.keyword[1] == 'cli-trigger-on-all':
+                return [
+                    ('create', 'after', 'create'),
+                    ('modify', 'after', 'create'),
+                    ('delete', 'after', 'create'),
+                    ('create', 'after', 'modify'),
+                    ('modify', 'after', 'modify'),
+                    ('delete', 'after', 'modify'),
+                    ('create', 'after', 'delete'),
+                    ('modify', 'after', 'delete'),
+                    ('delete', 'after', 'delete'),
+                ]
+                # Test result from TailF confd 8.4.7.1:
+                # 1 depends on 2
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'after', 'create'),
+                # ('create', 'after', 'modify'),
+                # ('modify', 'after', 'modify'),
+                # ('delete', 'after', 'modify'),
+                # ('create', 'after', 'delete'),
+                # ('modify', 'after', 'delete'),
+                # ('delete', 'after', 'delete'),
+                # 2 depends on 1
+                # ('create', 'after', 'create'),
+                # ('modify', 'after', 'create'),
+                # ('delete', 'after', 'create'),
+                # ('create', 'after', 'modify'),
+                # ('modify', 'after', 'modify'),
+                # ('delete', 'after', 'modify'),
+                # ('create', 'after', 'delete'),
+                # ('modify', 'after', 'delete'),
+                # ('delete', 'after', 'delete'),
+        return ordering
+    return []
+
+def add_tailf_annotation(module_namespaces, stmt, node):
+    if len(stmt.substmts) > 0:
+        sub_sm_dict = {
+            sub.keyword[1]: sub.arg if sub.arg is not None else ''
+            for sub in stmt.substmts
+            if (
+                isinstance(sub.keyword, tuple) and
+                'tailf' in sub.keyword[0]
+            )
+        }
+        node.set(
+            etree.QName(module_namespaces[stmt.keyword[0]],
+                        stmt.keyword[1]),
+            repr(sub_sm_dict) if sub_sm_dict else '',
+        )
+    else:
+        node.set(
+            etree.QName(module_namespaces[stmt.keyword[0]],
+                        stmt.keyword[1]),
+            stmt.arg if stmt.arg else '',
+        )
+
+
+def set_ordering_xpath(compiler, module):
+    # There are cases where a leafref node has TailF ordering annotations
+    # defined. For example:
+    # leaf nve {
+    #   description
+    #     "Network virtualization endpoint interface";
+    #   tailf:cli-allow-join-with-value {
+    #     tailf:cli-display-joined;
+    #   }
+    #   tailf:cli-diff-create-after "/ios:native/ios:interface/ios:nve/ios:name" {
+    #     tailf:cli-when-target-set;
+    #   }
+    #   tailf:cli-diff-delete-before "/ios:native/ios:interface/ios:nve/ios:name" {
+    #     tailf:cli-when-target-delete;
+    #   }
+    #   type leafref {
+    #     path "/ios:native/ios:interface/ios:nve/ios:name";
+    #   }
+    # }
+    # In this case, we treat TailF ordering annotations as higher priority and
+    # ignore the default leafref ordering constraints. To support this, we
+    # define a dictionary to track existing nodes that have TailF ordering
+    # annotations applied.
+    tailf_ordering = {}
+
+    for constraint_type in ["ordering_stmt_tailf", "ordering_stmt_leafref"]:
+        if (
+            hasattr(compiler, constraint_type) and
+            module in getattr(compiler, constraint_type)
+        ):
+            update_ordering_xpath(
+                compiler, module, constraint_type, tailf_ordering)
+
+
+def get_xpath(compiler, stmt):
+    schema_node = getattr(stmt, 'schema_node', None)
+    if schema_node is None:
+        return ''
+    if not hasattr(stmt, 'schema_xpath'):
+        stmt.schema_xpath = compiler.get_xpath_from_schema_node(
+            schema_node, type=Tag.LXML_XPATH)
+    return stmt.schema_xpath
+
+
+def update_ordering_xpath(compiler, module, constraint_type, tailf_ordering):
+    constraints = []
+    stmt = {}
+    xpath = {}
+    constraint_info = getattr(compiler, constraint_type)[module]
+
+    for stmt[0], stmt[1], constraint_list, xpath_stmt in constraint_info:
+
+        for i in range(2):
+            xpath[i] = get_xpath(compiler, stmt[i])
+
+            # Skip entries with missing Xpath. Missing Xpaths might be in a
+            # different module not compiled or due to other deviations.
+            if xpath[i] == '':
+                break
+        else:
+
+            # Track nodes that have TailF ordering annotations applied.
+            if constraint_type == "ordering_stmt_tailf":
+                if stmt[0] not in tailf_ordering:
+                    tailf_ordering[stmt[0]] = {}
+                if stmt[1] not in tailf_ordering[stmt[0]]:
+                    tailf_ordering[stmt[0]][stmt[1]] = True
+
+            # Skip leafref entries where it already has TailF ordering
+            # annotations applied.
+            if constraint_type == "ordering_stmt_leafref":
+                if (
+                    stmt[0] in tailf_ordering and
+                    stmt[1] in tailf_ordering[stmt[0]]
+                ):
+                    continue
+
+            ordering_match = xpath_stmt.instance_match \
+                if hasattr(xpath_stmt, 'instance_match') else None
+            skip_instance_match = get_skip_instance_match(compiler, xpath_stmt)
+            x0_before_x1 = 0
+            x1_before_x0 = 0
+
+            for oper_0, sequence, oper_1 in constraint_list:
+
+                # Skip entries with same Xpath and same operation.
+                if xpath[0] == xpath[1] and oper_0 == oper_1:
+                    continue
+
+                if sequence == 'before':
+                    constraints.append((
+                        xpath[0], oper_0, xpath[1], oper_1, xpath_stmt))
+                    update_schema_tree(stmt[0], oper_0, stmt[1], oper_1)
+                    x0_before_x1 |= DEPENDENCY_TYPE[(oper_0, oper_1)]
+                else:
+                    constraints.append((
+                        xpath[1], oper_1, xpath[0], oper_0, xpath_stmt))
+                    update_schema_tree(stmt[1], oper_1, stmt[0], oper_0)
+                    x1_before_x0 |= DEPENDENCY_TYPE[(oper_1, oper_0)]
+
+            if hasattr(compiler, "ordering") and module in compiler.ordering:
+
+                # If xpath[0] and xpath[1] are the same, we only add one entry
+                # to the ordering, and we consolidate x0_before_x1 and
+                # x1_before_x0 into one entry. This is because if they are the
+                # same, they refer to the same node, and we want to avoid
+                # adding duplicate entries in the ordering.
+                if (
+                    xpath[0] == xpath[1] and
+                    x1_before_x0 > 0
+                ):
+                    x0_before_x1 |= x1_before_x0
+                    x1_before_x0 = 0
+
+                if x0_before_x1 > 0:
+                    if xpath[0] not in compiler.ordering[module]:
+                        compiler.ordering[module][xpath[0]] = []
+                    compiler.ordering[module][xpath[0]].append(
+                        (xpath[1], f"{x0_before_x1:03x}", ordering_match, "1",
+                         skip_instance_match)
+                    )
+                if x1_before_x0 > 0:
+                    if xpath[1] not in compiler.ordering[module]:
+                        compiler.ordering[module][xpath[1]] = []
+                    compiler.ordering[module][xpath[1]].append(
+                        (xpath[0], f"{x1_before_x0:03x}", ordering_match, "0",
+                         skip_instance_match)
+                    )
+
+    attribute_name = "ordering_xpath_leafref" \
+        if constraint_type == "ordering_stmt_leafref" \
+        else "ordering_xpath_tailf"
+    getattr(compiler, attribute_name)[module] = constraints
+
+
+def get_skip_instance_match(compiler, xpath_stmt):
+    if (
+        not hasattr(xpath_stmt, 'skip_instance_match') or
+        len(xpath_stmt.skip_instance_match) == 0
+    ):
+        return None
+    skip_instance_match = []
+    for stmt in xpath_stmt.skip_instance_match:
+        xpath = get_xpath(compiler, stmt)
+        if len(xpath) > 0:
+            skip_instance_match.append(xpath)
+    return skip_instance_match if len(skip_instance_match) > 0 else None
+
+
+def update_schema_tree(stmt_0, oper_0, stmt_1, oper_1):
+    schema_node_1 = getattr(stmt_0, 'schema_node', None)
+    if schema_node_1 is None:
+        logger.warning(
+            f"Schema node not found for statement {stmt_0.keyword} "
+            f"at {stmt_0.pos}")
+        return
+    ordering_str = schema_node_1.get("before")
+    if ordering_str is None:
+        schema_node_1.set("before", repr({
+            oper_0: {stmt_1.schema_xpath: [oper_1]}
+        }))
+    else:
+        ordering = eval(ordering_str)
+        if oper_0 in ordering:
+            if stmt_1.schema_xpath in ordering[oper_0]:
+                if oper_1 in ordering[oper_0][stmt_1.schema_xpath]:
+                    return
+                else:
+                    ordering[oper_0][stmt_1.schema_xpath].append(oper_1)
+            else:
+                ordering[oper_0][stmt_1.schema_xpath] = [oper_1]
+        else:
+            ordering[oper_0] = {stmt_1.schema_xpath: [oper_1]}
+        schema_node_1.set("before", repr(ordering))
+
+
+def is_symmetric_tailf_ordering(context, xpath_stmt, node_stmt, target_stmt):
+    # It must be symmetric if the node_stmt and target_stmt are the same, because
+    # the ordering is applied to the same node, and the ordering should be
+    # symmetric in this case.
+    if node_stmt is target_stmt:
+        return True
+
+    if len(xpath_stmt.substmts) > 0:
+        return False
+    substmts = {
+        s for s in target_stmt.substmts
+        if isinstance(s.keyword, tuple) and
+        'tailf' in s.keyword[0] and
+        len(s.substmts) == 0 and
+        s.keyword[1] == xpath_stmt.keyword[1]
+    }
+    for substmt in substmts:
+        target = context.check_data_tree_xpath(
+            substmt, target_stmt, substmt)
+        if target == xpath_stmt.parent:
+            return True
+    return False

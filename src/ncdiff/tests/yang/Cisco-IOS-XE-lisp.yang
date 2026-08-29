@@ -71,7 +71,7 @@ module Cisco-IOS-XE-lisp {
   }
 
 
-  //router lisp new grouping starts 
+  //router lisp new grouping starts
   //router lisp service route import database protocol
   grouping router-lisp-inst-service-ip-route-import-database-protocol-grouping {
     container application {
@@ -339,13 +339,13 @@ module Cisco-IOS-XE-lisp {
     }
   }
 
-  //router lisp inst service ipv6 router-import 
+  //router lisp inst service ipv6 router-import
   grouping router-lisp-inst-service-ipv6-route-import-protocol-grouping {
     uses router-lisp-inst-service-ipv6-route-import-database-protocol-grouping;
     uses router-lisp-inst-service-ipv6-route-import-map-cache-protocol-grouping;
   }
 
-  //router lisp inst service ipv4 router-import 
+  //router lisp inst service ipv4 router-import
   grouping router-lisp-inst-service-ipv4-route-import-protocol-grouping {
     uses router-lisp-inst-service-ipv4-route-import-database-protocol-grouping;
     uses router-lisp-inst-service-ipv4-route-import-map-cache-protocol-grouping;
@@ -373,7 +373,7 @@ module Cisco-IOS-XE-lisp {
       }
     }
   }
-   
+
   //router lisp etr
   grouping router-lisp-etr-grouping {
     container etr-enable {
@@ -401,7 +401,7 @@ module Cisco-IOS-XE-lisp {
         }
       }
     }
-  } 
+  }
 
   //router lisp database mapping limit
   grouping router-lisp-database-mapping-limit-grouping {
@@ -422,7 +422,7 @@ module Cisco-IOS-XE-lisp {
           range "1..100";
         }
       }
-    } 
+    }
   }
 
   //router lisp map cache
@@ -466,7 +466,7 @@ module Cisco-IOS-XE-lisp {
       type inet:ipv6-address;
     }
   }
-  
+
   //router lisp map request source any
   grouping router-lisp-map-request-source-any-grouping {
     leaf map-request-source {
@@ -550,7 +550,7 @@ module Cisco-IOS-XE-lisp {
     }
   }
 
-  //router lisp service common 
+  //router lisp service common
   grouping router-lisp-service-common-grouping {
     container database-mapping {
       description
@@ -686,8 +686,8 @@ module Cisco-IOS-XE-lisp {
     uses router-lisp-map-cache-persistent-grouping;
     uses router-lisp-proxy-grouping;
     uses router-lisp-route-export-grouping;
-    uses router-lisp-sgt-grouping; 
-    uses router-lisp-use-petr-grouping; 
+    uses router-lisp-sgt-grouping;
+    uses router-lisp-use-petr-grouping;
   }
 
   //router lisp service ipv4
@@ -702,7 +702,7 @@ module Cisco-IOS-XE-lisp {
     uses router-lisp-map-request-source-ipv6-grouping;
   }
 
-  //router lisp four key 
+  //router lisp four key
   grouping router-lisp-four-key-grouping {
     leaf unc-pwd {
       description
@@ -724,10 +724,10 @@ module Cisco-IOS-XE-lisp {
          "The ENCRYPTED password";
       type string;
     }
-  } 
+  }
 
   //router lisp key hash function
-  grouping router-lisp-key-hash-function-grouping { 
+  grouping router-lisp-key-hash-function-grouping {
     leaf hash-function {
       description
         "authentication type";
@@ -757,8 +757,8 @@ module Cisco-IOS-XE-lisp {
       uses router-lisp-key-hash-function-grouping;
     }
   }
- 
-  //router lisp passowd key-7 
+
+  //router lisp passowd key-7
   grouping router-lisp-password-key-7-grouping {
     container key-7 {
       leaf ak-7 {
@@ -867,7 +867,7 @@ module Cisco-IOS-XE-lisp {
       }
     }
   }
- 
+
   //router lisp use-petr
   grouping router-lisp-use-petr-grouping {
     list use-petr {
@@ -906,28 +906,28 @@ module Cisco-IOS-XE-lisp {
           "LISP routes installed in the ALT table";
         type uint8 {
           range 1..255;
-        } 
+        }
       }
       leaf away {
         description
           "Administrative distance for RIB route installation";
         type uint8 {
           range 1..255;
-        } 
+        }
       }
       leaf dyn-eid {
         description
           "LISP installed routes of type dynamic-EID";
         type uint8 {
           range 1..255;
-        } 
+        }
       }
       leaf site-registrations {
         description
           "LISP installed routes of type site-registrations";
         type uint8 {
           range 1..255;
-        } 
+        }
       }
     }
   }
@@ -961,7 +961,7 @@ module Cisco-IOS-XE-lisp {
         description "Configures which Locators from a set are preferred";
         type uint8 {
           range 0..255;
-        } 
+        }
       }
       leaf weight {
         description "Traffic load-spreading among Locators";
@@ -969,14 +969,14 @@ module Cisco-IOS-XE-lisp {
           range 0..100;
         }
       }
-      leaf down { 
+      leaf down {
         description "Configure this database mapping down";
         type empty;
       }
     }
   }
 
-  //router lisp inst database mapping common 
+  //router lisp inst database mapping common
   grouping router-lisp-inst-database-mapping-common-grouping {
     leaf locator-set {
       description
@@ -997,7 +997,7 @@ module Cisco-IOS-XE-lisp {
       key "address";
       leaf address {
         type inet:ipv6-address;
-      } 
+      }
       uses router-lisp-inst-database-mapping-option-grouping;
     }
 
@@ -1034,7 +1034,7 @@ module Cisco-IOS-XE-lisp {
   //router lisp inst service ethernet
   grouping router-lisp-inst-service-ethernet-grouping {
     container eid-table {
-      description "Bind an eid-table"; 
+      description "Bind an eid-table";
       leaf vlan {
         description "VLAN configuration";
         type uint16 {
@@ -1042,7 +1042,7 @@ module Cisco-IOS-XE-lisp {
        }
       }
     }
-    container broadcast-underlay { 
+    container broadcast-underlay {
       description "Multicast group to use for underlay";
       leaf ipv4-multicast {
         description "IPv4 multicast group address";
@@ -1187,9 +1187,9 @@ module Cisco-IOS-XE-lisp {
     uses router-lisp-map-cache-persistent-grouping;
     uses router-lisp-proxy-grouping;
     uses router-lisp-route-export-grouping;
-    uses router-lisp-sgt-grouping; 
-    uses router-lisp-use-petr-grouping; 
-  } 
+    uses router-lisp-sgt-grouping;
+    uses router-lisp-use-petr-grouping;
+  }
 
   //router lisp inst service ipv4 grouping
   grouping router-lisp-inst-service-ipv4-grouping {
@@ -1243,7 +1243,7 @@ module Cisco-IOS-XE-lisp {
     }
   }
 
-  //router lisp inst 
+  //router lisp inst
   grouping router-lisp-inst-grouping {
     container decapsulation {
       description
@@ -1421,7 +1421,7 @@ module Cisco-IOS-XE-lisp {
       }
     }
     container service {
-      description 
+      description
         "Configure lisp service type";
       presence true;
       container ipv4 {
@@ -1444,11 +1444,11 @@ module Cisco-IOS-XE-lisp {
           uses router-lisp-inst-service-ethernet-grouping;
         }
         uses router-lisp-inst-service-ethernet-grouping;
-      } 
+      }
     }
   }
 
-  //router lisp new grouping ends 
+  //router lisp new grouping ends
 
   grouping router-lisp-ip-route-import-map-cache-grouping {
     container map-cache-container {
@@ -1462,7 +1462,7 @@ module Cisco-IOS-XE-lisp {
   }
 
   grouping router-lisp-ip-route-import-database-grouping {
-    container lisp-ip-route-import { 
+    container lisp-ip-route-import {
       leaf route-map {
         description
           "Route map for route selection filtering";
@@ -1525,6 +1525,7 @@ module Cisco-IOS-XE-lisp {
       description
         "Activate LISP-ALT functionality in VRF";
       status deprecated;
+      ios-types:yang-meta-data "deprecated-without-replacement";
       type string;
     }
     container database-mapping {
@@ -2173,10 +2174,10 @@ module Cisco-IOS-XE-lisp {
       description
         "Configures a LISP Egress Tunnel Router (ETR)";
       container map-server {
-        description 
+        description
           "Configures map server for ETR registration";
         leaf source-address {
-          description 
+          description
             "Configures map server source address";
           type string;
         }
@@ -2393,7 +2394,7 @@ module Cisco-IOS-XE-lisp {
     }
   }
 
-  //router lisp site common grouping 
+  //router lisp site common grouping
   grouping router-lisp-site-common-grouping {
     container authentication-key {
       description
@@ -2451,13 +2452,13 @@ module Cisco-IOS-XE-lisp {
           description
             "Accept registrations for any L2 EID records";
           type empty;
-        } 
+        }
       }
       leaf any-mac {
         description
           "Accept registrations for any L2 EID records";
         type empty;
-      } 
+      }
     }
     container eid-record {
       description
@@ -2477,13 +2478,13 @@ module Cisco-IOS-XE-lisp {
           description
             "Accept registrations for any L2 EID records";
           type empty;
-        } 
+        }
       }
       leaf any-mac {
         description
           "Accept registrations for any L2 EID records";
         type empty;
-      } 
+      }
     }
     leaf site-id {
       description
@@ -2492,9 +2493,9 @@ module Cisco-IOS-XE-lisp {
          range "0..4294967295";
       }
     }
-  }  
-  
-  //router lisp site grouping 
+  }
+
+  //router lisp site grouping
   grouping rouer-lisp-site-grouping {
     list site {
       description
@@ -2507,7 +2508,7 @@ module Cisco-IOS-XE-lisp {
       }
       container default {
         uses  router-lisp-site-common-grouping;
-      } 
+      }
       uses  router-lisp-site-common-grouping;
     }
   }
@@ -2827,7 +2828,7 @@ module Cisco-IOS-XE-lisp {
         type empty;
       }
     }
- 
+
     uses rouer-lisp-site-grouping;
 
     leaf site-id {
