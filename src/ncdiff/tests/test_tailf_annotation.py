@@ -84,7 +84,8 @@ class TestNative(unittest.TestCase):
         self.assertEqual(len(stmts), 1)
         xpath_stmt = stmts[0]
 
-        target = self.compiler.context.check_data_tree_xpath(xpath_stmt, stmt)
+        target = self.compiler.context.check_data_tree_xpath(
+            xpath_stmt, stmt, xpath_stmt)
 
         module_stmt = self.compiler.context.get_module('Cisco-IOS-XE-native')
         stmts = [i for i in module_stmt.substmts if i.arg == "native"]
@@ -317,7 +318,7 @@ class TestNative(unittest.TestCase):
         path_stmt = type_stmt.search_one('path')
         self.assertIsNotNone(path_stmt)
         target = self.compiler.context.check_data_tree_xpath(
-            path_stmt, leafref)
+            path_stmt, leafref, leafref)
 
         # Because this is ordering_stmt_leafref, xpath_stmt should be
         # leafref_stmt. Please refer to comments in set_ordering_stmt_leafref()
@@ -395,7 +396,7 @@ class TestNative(unittest.TestCase):
         self.assertEqual(len(tuples), 2)
 
         target = self.compiler.context.check_data_tree_xpath(
-            annotation, node)
+            annotation, node, annotation)
         positions = [
             'Cisco-IOS-XE-sla-ann.yang:76',
             'Cisco-IOS-XE-sla-ann.yang:79',
@@ -501,8 +502,8 @@ class TestNative(unittest.TestCase):
         self.assertEqual(len(stmts), 1)
         annotation = stmts[0]
         target = self.compiler.context.check_data_tree_xpath(
-            annotation, node)
-        ordering = get_tailf_ordering(self.compiler.context, annotation, target)
+            annotation, node, annotation)
+        ordering = get_tailf_ordering(self.compiler.context, annotation, node, target)
         self.assertEqual(ordering, [('create', 'after', 'delete')])
 
         stmts = [i for i in node.substmts
@@ -512,8 +513,8 @@ class TestNative(unittest.TestCase):
         self.assertEqual(len(stmts), 1)
         annotation = stmts[0]
         target = self.compiler.context.check_data_tree_xpath(
-            annotation, node)
-        ordering = get_tailf_ordering(self.compiler.context, annotation, target)
+            annotation, node, annotation)
+        ordering = get_tailf_ordering(self.compiler.context, annotation, node, target)
         self.assertEqual(ordering, [('delete', 'before', 'create')])
 
     def test_is_symmetric_tailf_ordering(self):
@@ -551,8 +552,8 @@ class TestNative(unittest.TestCase):
         self.assertEqual(len(stmts), 1)
         annotation = stmts[0]
         target = self.compiler.context.check_data_tree_xpath(
-            annotation, node)
-        func_result = is_symmetric_tailf_ordering(self.compiler.context, annotation, target)
+            annotation, node, annotation)
+        func_result = is_symmetric_tailf_ordering(self.compiler.context, annotation, node, target)
         self.assertFalse(func_result)
 
     def test_is_deprecated_without_replacement(self):
