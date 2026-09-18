@@ -22,7 +22,7 @@ except ImportError:
 from .errors import ModelError
 from .composer import Tag
 from .tailf import is_deprecated_without_replacement
-from .tailf import is_tailf_ordering, get_tailf_ordering
+from .tailf import get_effective_tailf_orderings, get_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
 from .xpath import chk_xpath_path
 
@@ -1538,6 +1538,7 @@ class ModelCompiler(object):
                     n.set('ordered-by', 'user')
 
         # Tailf annotations
+        effective_orderings = get_effective_tailf_orderings(child)
         for ch in child.substmts:
             if (
                 isinstance(ch.keyword, tuple) and
@@ -1563,7 +1564,7 @@ class ModelCompiler(object):
                                 ),
                                 ch.arg if ch.arg else '',
                             )
-                    elif is_tailf_ordering(ch):
+                    elif ch in effective_orderings:
                         target = self.context.check_data_tree_xpath(
                             ch, child, ch)
                         if target is not None:

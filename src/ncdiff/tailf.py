@@ -8,6 +8,20 @@ from .composer import Tag
 logger = logging.getLogger(__name__)
 
 
+TAILF_ORDERING_ANNOTATIONS = {
+    'cli-diff-after', 'cli-diff-before',
+    'cli-diff-create-after', 'cli-diff-create-before',
+    'cli-diff-delete-after', 'cli-diff-delete-before',
+    'cli-diff-modify-after', 'cli-diff-modify-before',
+    'cli-diff-set-after', 'cli-diff-set-before',
+    'cli-diff-dependency',
+}
+
+LEGACY_TAILF_ORDERING_ANNOTATIONS = {
+    'cli-diff-dependency',
+}
+
+
 DEPENDENCY_TYPE = {
     ("create", "create"): 1,
     ("create", "delete"): 2,
@@ -24,16 +38,28 @@ DEPENDENCY_TYPE = {
 def is_tailf_ordering(stmt):
     if isinstance(stmt.keyword, tuple):
         m, identifier = stmt.keyword
-        return m == 'tailf-common' and identifier in {
-            'cli-diff-after', 'cli-diff-before',
-            'cli-diff-create-after', 'cli-diff-create-before',
-            'cli-diff-delete-after', 'cli-diff-delete-before',
-            'cli-diff-modify-after', 'cli-diff-modify-before',
-            'cli-diff-set-after', 'cli-diff-set-before',
-            'cli-diff-dependency',
-        }
+        return m == 'tailf-common' and identifier in TAILF_ORDERING_ANNOTATIONS
     else:
         return False
+
+
+def get_effective_tailf_orderings(node_stmt):
+    """Return the Tailf ordering annotations that apply to ``node_stmt``.
+
+    ``cli-diff-dependency`` is a legacy ordering annotation.  Tailf ignores
+    it when the node also has a newer ordering annotation, so do the same
+    here while preserving it when it is the node's only ordering annotation.
+    """
+    orderings = [s for s in node_stmt.substmts if is_tailf_ordering(s)]
+    if any(
+        s.keyword[1] not in LEGACY_TAILF_ORDERING_ANNOTATIONS
+        for s in orderings
+    ):
+        return [
+            s for s in orderings
+            if s.keyword[1] not in LEGACY_TAILF_ORDERING_ANNOTATIONS
+        ]
+    return orderings
 
 
 def is_deprecated_without_replacement(stmt):

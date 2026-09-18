@@ -6,6 +6,7 @@ import unittest
 from ncdiff.composer import Tag
 from ncdiff.model import ModelCompiler
 from ncdiff.tailf import is_tailf_ordering, get_tailf_ordering
+from ncdiff.tailf import get_effective_tailf_orderings
 from ncdiff.tailf import is_symmetric_tailf_ordering
 from ncdiff.tailf import is_deprecated_without_replacement
 
@@ -21,6 +22,24 @@ def delete_xml_files(folder):
 
 
 class TestNative(unittest.TestCase):
+
+    def test_get_effective_tailf_orderings(self):
+        def annotation(name):
+            return type(
+                'Statement', (), {'keyword': ('tailf-common', name)}
+            )()
+
+        legacy = annotation('cli-diff-dependency')
+        modern = annotation('cli-diff-create-after')
+        unrelated = annotation('cli-description')
+
+        node = type(
+            'Statement', (), {'substmts': [legacy, unrelated]}
+        )()
+        self.assertEqual(get_effective_tailf_orderings(node), [legacy])
+
+        node.substmts = [legacy, modern, unrelated]
+        self.assertEqual(get_effective_tailf_orderings(node), [modern])
 
     @classmethod
     def setUpClass(cls):
