@@ -24,22 +24,59 @@ def delete_xml_files(folder):
 class TestNative(unittest.TestCase):
 
     def test_get_effective_tailf_orderings(self):
-        def annotation(name):
-            return type(
-                'Statement', (), {'keyword': ('tailf-common', name)}
-            )()
+        class Statement:
+            def __init__(self, name, arg):
+                self.keyword = ('tailf-common', name)
+                self.arg = arg
+                self.substmts = []
 
-        legacy = annotation('cli-diff-dependency')
-        modern = annotation('cli-diff-create-after')
-        unrelated = annotation('cli-description')
+        class Context:
+            def __init__(self, targets):
+                self.targets = targets
+                self.calls = []
 
-        node = type(
-            'Statement', (), {'substmts': [legacy, unrelated]}
-        )()
-        self.assertEqual(get_effective_tailf_orderings(node), [legacy])
+            def check_data_tree_xpath(self, stmt, node_stmt, attr_stmt):
+                self.calls.append(stmt)
+                return self.targets[stmt]
 
-        node.substmts = [legacy, modern, unrelated]
-        self.assertEqual(get_effective_tailf_orderings(node), [modern])
+        def check(statements, targets, expected, calls):
+            node = type('Node', (), {'substmts': statements})()
+            context = Context(targets)
+            cache = {}
+            actual = get_effective_tailf_orderings(context, node, cache)
+            self.assertEqual(
+                [stmt.keyword[1] for stmt in actual], expected)
+            self.assertEqual(len(context.calls), calls)
+
+        legacy = Statement(
+            'cli-diff-dependency', '/ios:native/ios:interface')
+        modern = Statement(
+            'cli-diff-delete-after', '/ios:native/ios:interface')
+        check(
+            [legacy, modern], {},
+            ['cli-diff-delete-after'], 0)
+
+        legacy = Statement(
+            'cli-diff-dependency', '/other:native/other:interface')
+        modern = Statement(
+            'cli-diff-delete-after', '/ios:native/ios:interface')
+        target = object()
+        check(
+            [legacy, modern], {legacy: target, modern: target},
+            ['cli-diff-delete-after'], 2)
+
+        legacy = Statement(
+            'cli-diff-dependency', '/ios:native/ios:aaa')
+        modern = Statement(
+            'cli-diff-delete-after', '/ios:native/ios:interface')
+        check(
+            [legacy, modern], {legacy: object(), modern: object()},
+            ['cli-diff-dependency', 'cli-diff-delete-after'], 2)
+
+        legacy = Statement(
+            'cli-diff-dependency', '/ios:native/ios:aaa')
+        check(
+            [legacy], {}, ['cli-diff-dependency'], 0)
 
     @classmethod
     def setUpClass(cls):

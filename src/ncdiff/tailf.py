@@ -43,23 +43,61 @@ def is_tailf_ordering(stmt):
         return False
 
 
-def get_effective_tailf_orderings(node_stmt):
+def get_effective_tailf_orderings(
+        context, node_stmt, target_cache={}):
     """Return the Tailf ordering annotations that apply to ``node_stmt``.
 
-    ``cli-diff-dependency`` is a legacy ordering annotation.  Tailf ignores
-    it when the node also has a newer ordering annotation, so do the same
-    here while preserving it when it is the node's only ordering annotation.
+    ``cli-diff-dependency`` is overridden by a newer ordering annotation only
+    when both annotations point to the same target.  Compare the raw XPath
+    arguments first, which handles the common case without resolving any
+    targets.  For dependency annotations whose arguments do not match, use
+    resolved targets to account for equivalent XPaths written differently.
+
+    ``target_cache`` is shared with the model compiler so targets resolved by
+    the slow path are not resolved again while building the ordering list.
     """
     orderings = [s for s in node_stmt.substmts if is_tailf_ordering(s)]
-    if any(
-        s.keyword[1] not in LEGACY_TAILF_ORDERING_ANNOTATIONS
-        for s in orderings
-    ):
-        return [
-            s for s in orderings
-            if s.keyword[1] not in LEGACY_TAILF_ORDERING_ANNOTATIONS
-        ]
-    return orderings
+    newer_orderings = [
+        s for s in orderings
+        if s.keyword[1] not in LEGACY_TAILF_ORDERING_ANNOTATIONS
+    ]
+    legacy_orderings = [
+        s for s in orderings
+        if s.keyword[1] in LEGACY_TAILF_ORDERING_ANNOTATIONS
+    ]
+
+    if not legacy_orderings or not newer_orderings:
+        return orderings
+
+    def resolve_target(stmt):
+        stmt_id = id(stmt)
+        if stmt_id not in target_cache:
+            target_cache[stmt_id] = context.check_data_tree_xpath(
+                stmt, node_stmt, stmt)
+        return target_cache[stmt_id]
+
+    newer_args = {s.arg for s in newer_orderings}
+    fast_shadowed = {
+        id(s) for s in legacy_orderings if s.arg in newer_args
+    }
+    slow_dependencies = [
+        s for s in legacy_orderings if id(s) not in fast_shadowed
+    ]
+
+    shadowed = set(fast_shadowed)
+    if slow_dependencies:
+        newer_targets = set()
+        for stmt in newer_orderings:
+            target = resolve_target(stmt)
+            if target is not None:
+                newer_targets.add(id(target))
+
+        for stmt in slow_dependencies:
+            target = resolve_target(stmt)
+            if target is not None and id(target) in newer_targets:
+                shadowed.add(id(stmt))
+
+    return [s for s in orderings if id(s) not in shadowed]
 
 
 def is_deprecated_without_replacement(stmt):

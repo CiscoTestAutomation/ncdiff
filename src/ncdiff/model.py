@@ -1538,7 +1538,9 @@ class ModelCompiler(object):
                     n.set('ordered-by', 'user')
 
         # Tailf annotations
-        effective_orderings = get_effective_tailf_orderings(child)
+        ordering_target_cache = {}
+        effective_orderings = get_effective_tailf_orderings(
+            self.context, child, ordering_target_cache)
         for ch in child.substmts:
             if (
                 isinstance(ch.keyword, tuple) and
@@ -1565,8 +1567,11 @@ class ModelCompiler(object):
                                 ch.arg if ch.arg else '',
                             )
                     elif ch in effective_orderings:
-                        target = self.context.check_data_tree_xpath(
-                            ch, child, ch)
+                        if id(ch) in ordering_target_cache:
+                            target = ordering_target_cache[id(ch)]
+                        else:
+                            target = self.context.check_data_tree_xpath(
+                                ch, child, ch)
                         if target is not None:
                             ordering = get_tailf_ordering(
                                 self.context, ch, child, target)
