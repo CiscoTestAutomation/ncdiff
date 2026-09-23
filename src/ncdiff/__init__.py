@@ -142,16 +142,12 @@ def request(self, config, format='xml', target='candidate',
     if default_operation is not None:
         # TODO: check if it is a valid default-operation
         sub_ele(node, "default-operation").text = default_operation
-# <<<<<<< HEAD
-#         node.append(validated_element(config, ("config", qualify("config"))))
-# =======
     if format == 'xml':
         # node.append(validated_element(config, ("config", qualify("config"))))
         _append(node, validated_element(config, ("config", qualify("config"))))
     if format == 'text':
         config_text = sub_ele(node, "config-text")
         sub_ele(config_text, "configuration-text").text = config
-# >>>>>>> juniper
     return self._request(node)
 
 
