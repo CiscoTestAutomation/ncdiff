@@ -23,6 +23,7 @@ from .errors import ModelError
 from .composer import Tag
 from .tailf import is_deprecated_without_replacement
 from .tailf import get_effective_tailf_orderings, get_tailf_ordering
+from .tailf import is_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
 from .xpath import chk_xpath_path
 
@@ -1566,21 +1567,25 @@ class ModelCompiler(object):
                                 ),
                                 ch.arg if ch.arg else '',
                             )
-                    elif ch in effective_orderings:
-                        if id(ch) in ordering_target_cache:
-                            target = ordering_target_cache[id(ch)]
-                        else:
-                            target = self.context.check_data_tree_xpath(
-                                ch, child, ch)
-                        if target is not None:
-                            ordering = get_tailf_ordering(
-                                self.context, ch, child, target)
-                            self.ordering_stmt_tailf[module.arg].append((
-                                child,
-                                target,
-                                ordering,
-                                ch,
-                            ))
+                    elif is_tailf_ordering(ch):
+                        # A shadowed cli-diff-dependency is still ordering
+                        # metadata, so do not serialize it as a Tailf
+                        # annotation on the schema node.
+                        if ch in effective_orderings:
+                            if id(ch) in ordering_target_cache:
+                                target = ordering_target_cache[id(ch)]
+                            else:
+                                target = self.context.check_data_tree_xpath(
+                                    ch, child, ch)
+                            if target is not None:
+                                ordering = get_tailf_ordering(
+                                    self.context, ch, child, target)
+                                self.ordering_stmt_tailf[module.arg].append((
+                                    child,
+                                    target,
+                                    ordering,
+                                    ch,
+                                ))
                     else:
                         add_tailf_annotation(self.module_namespaces, ch, n)
                 else:
