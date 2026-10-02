@@ -26,6 +26,7 @@ from .tailf import get_effective_tailf_orderings, get_tailf_ordering
 from .tailf import is_tailf_ordering
 from .tailf import add_tailf_annotation, set_ordering_xpath
 from .xpath import chk_xpath_path
+from .xpath import add_absolute_xpath_instance_skips
 
 
 # create a logger for this module
@@ -724,6 +725,7 @@ class CompilerContext(Context):
             attr_stmt.instance_match = []
 
         p = xpath_parser.parse(xpath_stmt.arg)
+        is_absolute = False
         if isinstance(p, list):
             node = chk_xpath_path(
                 self,
@@ -734,6 +736,7 @@ class CompilerContext(Context):
             )
         elif isinstance(p, tuple):
             if p[0] == 'absolute':
+                is_absolute = True
                 node = chk_xpath_path(
                     self,
                     attr_stmt,
@@ -763,6 +766,9 @@ class CompilerContext(Context):
                            f"{xpath_stmt.pos}")
         else:
             xpath_stmt.i_annotate_node = node
+            if is_absolute:
+                add_absolute_xpath_instance_skips(
+                    attr_stmt, node_stmt, node)
         return node
 
     def check_schema_tree_xpath(self, xpath_stmt):

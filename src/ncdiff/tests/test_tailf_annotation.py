@@ -161,6 +161,67 @@ class TestNative(unittest.TestCase):
 
         self.assertIs(target, stmt)
 
+    def _check_absolute_nhrp_xpath(self, xpath):
+        module = self.compiler.context.get_module('Cisco-IOS-XE-native')
+        source = module
+        path = ['native', 'interface', 'Tunnel', 'ip', 'nhrp', 'map']
+        for name in path:
+            source = next(child for child in source.i_children
+                          if child.arg == name)
+
+        xpath_stmt = type('XPathStatement', (), {})()
+        xpath_stmt.arg = xpath
+        xpath_stmt.i_orig_module = self.compiler.context.get_module(
+            'Cisco-IOS-XE-nhrp')
+        xpath_stmt.pos = source.pos
+        target = self.compiler.context.check_data_tree_xpath(
+            xpath_stmt, source, xpath_stmt)
+        return xpath_stmt, target
+
+    def test_absolute_xpath_skips_shared_list_without_predicate(self):
+        xpath = ('/ios:native/ios:interface/ios:Tunnel/ios:ip/'
+                 'ios-nhrp:nhrp/ios-nhrp:nhs')
+        xpath_stmt, target = self._check_absolute_nhrp_xpath(xpath)
+
+        # Resolve the shared Tunnel list in the schema.
+        module = self.compiler.context.get_module('Cisco-IOS-XE-native')
+        tunnel = next(child for child in module.i_children
+                      if child.arg == 'native')
+        tunnel = next(child for child in tunnel.i_children
+                      if child.arg == 'interface')
+        tunnel = next(child for child in tunnel.i_children
+                      if child.arg == 'Tunnel')
+        self.assertIsNotNone(target)
+        self.assertEqual(xpath_stmt.skip_instance_match, [tunnel])
+
+    def test_absolute_xpath_predicate_matches_shared_list(self):
+        xpath = ("/ios:native/ios:interface/ios:Tunnel[ios:name='1']/ios:ip/"
+                 'ios-nhrp:nhrp/ios-nhrp:nhs')
+        xpath_stmt, target = self._check_absolute_nhrp_xpath(xpath)
+
+        self.assertIsNotNone(target)
+        self.assertEqual(xpath_stmt.skip_instance_match, [])
+        self.assertEqual(len(xpath_stmt.instance_match), 1)
+        self.assertEqual(xpath_stmt.instance_match[0][2].arg, 'Tunnel')
+
+    def test_absolute_xpath_predicate_on_other_list_keeps_shared_skip(self):
+        xpath = ("/ios:native/ios:interface/ios:Tunnel/ios:ip/"
+                 'ios-nhrp:nhrp/ios-nhrp:nhs/ios-nhrp:ipv4'
+                 "[ios-nhrp:ipv4='192.0.2.1']")
+        xpath_stmt, target = self._check_absolute_nhrp_xpath(xpath)
+
+        module = self.compiler.context.get_module('Cisco-IOS-XE-native')
+        tunnel = next(child for child in module.i_children
+                      if child.arg == 'native')
+        tunnel = next(child for child in tunnel.i_children
+                      if child.arg == 'interface')
+        tunnel = next(child for child in tunnel.i_children
+                      if child.arg == 'Tunnel')
+        self.assertIsNotNone(target)
+        self.assertEqual(xpath_stmt.skip_instance_match, [tunnel])
+        self.assertEqual(len(xpath_stmt.instance_match), 1)
+        self.assertEqual(xpath_stmt.instance_match[0][2].arg, 'ipv4')
+
     def test_check_schema_tree_xpath(self):
         # Line 75 in Cisco-IOS-XE-sla-ann.yang:
         # tailf:annotate "/ios:native/ios:ip/ios-sla:sla/ios-sla:entry/ios-sla:sla-param/ios-sla:path-echo-case/ios-sla:path-echo/ios-sla:dst-ip" {

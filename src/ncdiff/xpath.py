@@ -5,6 +5,43 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def list_ancestors(node):
+    """Return list nodes on the path from ``node`` to the root."""
+    ancestors = []
+    while node is not None and node != 'root':
+        if node.keyword == 'list':
+            ancestors.append(node)
+        node = pyang.util.data_node_up(node)
+    return ancestors
+
+
+def add_absolute_xpath_instance_skips(attr_stmt, source, target):
+    """Skip default matching on shared lists for absolute paths."""
+    source_lists = list_ancestors(source)
+    target_lists = list_ancestors(target)
+    shared_lists = [
+        node for node in source_lists
+        if any(node is target_node for target_node in target_lists)
+    ]
+    instance_match = getattr(attr_stmt, 'instance_match', [])
+    explicitly_matched = [
+        match[2] for match in instance_match
+        if len(match) > 2 and any(
+            match[2] is node for node in shared_lists)
+    ]
+    skips = [
+        node for node in getattr(attr_stmt, 'skip_instance_match', [])
+        if not any(node is matched for matched in explicitly_matched)
+    ]
+    for node in shared_lists:
+        has_explicit_match = any(
+            node is matched for matched in explicitly_matched)
+        already_skipped = any(node is skipped for skipped in skips)
+        if not has_explicit_match and not already_skipped:
+            skips.append(node)
+    attr_stmt.skip_instance_match = skips
+
+
 def get_context_node(stmt):
     if stmt.parent.keyword == 'augment':
         node = stmt.parent.i_target_node
