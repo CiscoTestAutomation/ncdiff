@@ -1279,9 +1279,21 @@ class ModelCompiler(object):
         self.ordering = {}
         self._dependencies = {}
 
+        # self.exclude_obsolete is a feature flag to exclude obsolete nodes.
         self.exclude_obsolete = False
+
+        # self.exclude_deprecated is a feature flag to exclude deprecated nodes.
         self.exclude_deprecated = False
+
+        # self.include_deprecated_without_replacement is a feature flag to
+        # include nodes with tailf:deprecated-without-replacement even they are
+        # deprecated.
         self.include_deprecated_without_replacement = False
+
+        # self.exclude_cli_ignore_modified is a feature flag to exclude nodes
+        # with tailf:cli-ignore-modified when self.exclude_deprecated is True.
+        self.exclude_cli_ignore_modified = False
+
         self.include_xpaths = set()
         self.exclude_xpaths = set()
 
@@ -1808,6 +1820,21 @@ class ModelCompiler(object):
                 return '|'.join(value_stmts)
         return ''
 
+    # tailf:deprecated-without-replacement is not hereditary
+    def deprecated_without_replacement(self, schema_node):
+        return schema_node.get(
+            'deprecated-without-replacement', default=None) == 'true'
+
+    # tailf:cli-ignore-modified is hereditary
+    def cli_ignore_modified(self, schema_node):
+        if schema_node.get(
+            'cli-ignore-modified', default=None) == 'true':
+            return True
+        parent = schema_node.getparent()
+        if parent is not None:
+            return self.cli_ignore_modified(parent)
+        return False
+
     def skip(self, statement, schema_node):
         xpath = self.get_xpath_from_schema_node(
             schema_node, type=Tag.LXML_XPATH)
@@ -1825,17 +1852,38 @@ class ModelCompiler(object):
 
         # Statement status is checked
         status = schema_node.get('status', default=None)
-        deprecated_without_replacement = schema_node.get(
-            'deprecated-without-replacement', default=None)
+        deprecated_without_replacement = self.deprecated_without_replacement(
+            schema_node)
+        cli_ignore_modified = self.cli_ignore_modified(
+            schema_node)
+        # Obsolete nodes are removed when exclude_obsolete is enabled.
+        # Deprecated nodes are filtered only when exclude_deprecated is
+        # enabled. include_deprecated_without_replacement keeps annotated
+        # nodes so CLI-to-XML translation can still represent them. For other
+        # deprecated nodes, exclude_cli_ignore_modified keeps nodes without
+        # the inherited tailf:cli-ignore-modified annotation and removes those
+        # with it. If exclude_cli_ignore_modified is disabled, those remaining
+        # deprecated nodes are removed. The deprecated-without-replacement
+        # exception takes precedence when both annotations apply.
         if (
             status == 'obsolete' and
-            self.exclude_obsolete or
-            status == 'deprecated' and
-            self.exclude_deprecated and not (
-                self.include_deprecated_without_replacement and
-                deprecated_without_replacement == 'true'
-            )
+            self.exclude_obsolete
         ):
+            return True
+        elif (
+            status == 'deprecated' and
+            self.exclude_deprecated
+        ):
+            if (
+                self.include_deprecated_without_replacement and
+                deprecated_without_replacement
+            ):
+                return False
+            if self.exclude_cli_ignore_modified:
+                if cli_ignore_modified:
+                    return True
+                else:
+                    return False
             return True
         return False
 
