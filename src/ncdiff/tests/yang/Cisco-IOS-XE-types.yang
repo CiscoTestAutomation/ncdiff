@@ -27,6 +27,16 @@ module Cisco-IOS-XE-types {
      All rights reserved.";
 
   // =========================================================================
+  // EXTENSION
+  // =========================================================================
+
+  extension yang-meta-data {
+    argument value;
+    description "Extra information associated with the yang node to tell
+                 model compiler to compile it in a specific way";
+  }
+
+  // =========================================================================
   // REVISION
   // =========================================================================
   revision 2017-11-27 {
@@ -685,8 +695,8 @@ module Cisco-IOS-XE-types {
       }
     }
   }
-    
-  // Comma-separated numbers with ranges  
+
+  // Comma-separated numbers with ranges
   typedef range-string {
     type string {
       pattern

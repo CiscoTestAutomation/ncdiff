@@ -271,7 +271,9 @@ class ModelDevice(manager.Manager):
         if download in ['check', 'force']:
             d = ModelDownloader(self, folder)
             d.download_all(check_before_download=(download == 'check'))
-        self.compiler = ModelCompiler(folder)
+            self.compiler = ModelCompiler(folder, context=d.context)
+        else:
+            self.compiler = ModelCompiler(folder)
 
     def load_model(self, model):
         '''load_model
